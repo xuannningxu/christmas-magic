@@ -77,6 +77,10 @@ main{grid-template-columns:minmax(0,1fr)}
 .gesture-more ul{display:table;text-align:left;margin:.2rem auto .4rem;padding-left:1.25rem;line-height:1.65}
 @media(max-width:680px){video{top:auto;bottom:1rem}}
 .rights-notice{max-width:38rem;margin:.75rem auto 0;font-size:.78rem;line-height:1.6;color:#dfbe91}
+
+.camera-entry{display:flex;align-items:center;justify-content:center;gap:.65rem;flex-wrap:wrap}
+.camera-entry #preview{position:static;inset:auto;display:block;width:clamp(68px,19vw,96px);height:auto;aspect-ratio:4/3;object-fit:cover;border:1px solid #c59b65a0;border-radius:12px;box-shadow:0 4px 18px #0009;transform:scaleX(-1)}
+.camera-entry #preview[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -84,7 +88,8 @@ main{grid-template-columns:minmax(0,1fr)}
 <noscript><p>当前文件预览无法运行交互。请保存 HTML 后，用电脑上的 Edge 或 Chrome 打开。</p></noscript>
 <header><span class="eyebrow">冬日手势互动</span><h1>Merry Christmas</h1><p class="creator">创意 · Xxnefeli</p><section class="gesture-start" aria-label="摄像头手势玩法">
 <p class="gesture-intro">用手势操控圣诞树</p>
-<button id="camera" type="button" aria-describedby="status">开启摄像头</button>
+<div class="camera-entry"><button id="camera" type="button" aria-describedby="status">开启摄像头</button>
+<video id="preview" playsinline muted hidden aria-label="摄像头镜像预览"></video></div>
 <p id="status" role="status">点击开启，允许摄像头权限后把一只手放进画面</p>
 <div class="gesture-basics"><span><b>🖐️</b> 张手散开</span><span><b>✊</b> 握拳聚拢</span></div>
 <details class="gesture-more"><summary>更多手势玩法</summary>
@@ -108,7 +113,7 @@ main{grid-template-columns:minmax(0,1fr)}
 
 <p class="rights-notice">原创设计 · Xxnefeli<br>严禁抄袭、冒用署名，或未经授权复制、改编、转载本站原创设计与交互实现。欢迎通过本站分享功能转发作品。</p>
 </footer>
-<video id="preview" playsinline muted hidden aria-label="Mirrored camera preview"></video>
+
 </main>
 <dialog id="link-dialog"><form method="dialog"><button aria-label="关闭">×</button></form><h2>分享我的圣诞树</h2><p>拿到链接的人可以查看缩小后的照片。</p><textarea id="share-url" readonly rows="3" aria-label="分享链接"></textarea><button id="copy-url">复制链接</button><p id="copy-status" role="status"></p></dialog>
 <dialog id="tip-dialog" aria-labelledby="tip-title">
