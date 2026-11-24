@@ -69,12 +69,14 @@ main{grid-template-columns:minmax(0,1fr)}
 <button id="camera">开启摄像头</button>
 </div>
 <button id="tip-button" aria-haspopup="dialog"><span aria-hidden="true">💛</span><span aria-hidden="true">😛&nbsp;</span>支持 Xxnefeli</button>
-<button id="share-tree" type="button">分享我的圣诞树</button>
+<button id="share-tree" type="button">导出网页文件</button>
+<button id="share-online">分享我的圣诞树链接</button>
 <p id="photo-save-status" role="status" hidden></p>
 <p id="status" role="status">Camera off · Manual controls available</p>
 </footer>
 <video id="preview" playsinline muted hidden aria-label="Mirrored camera preview"></video>
 </main>
+<dialog id="link-dialog"><form method="dialog"><button aria-label="关闭">×</button></form><h2>分享我的圣诞树</h2><p>拿到链接的人可以查看缩小后的照片。</p><textarea id="share-url" readonly rows="3" aria-label="分享链接"></textarea><button id="copy-url">复制链接</button><p id="copy-status" role="status"></p></dialog>
 <dialog id="tip-dialog" aria-labelledby="tip-title">
 <form method="dialog"><button class="close-photo" aria-label="关闭赞赏">×</button></form>
 <h2 id="tip-title">微信赞赏</h2>
@@ -180,7 +182,20 @@ const photos = [1018, 1036, 1043, 106, 1044, 1015, 1016, 1020, 1024, 1039, 1050,
 const customPhotos = new Map();
 const photoBlobs = new Map();
 const photoSaveStatus = document.getElementById('photo-save-status');
-const sharedPhotos = JSON.parse(document.getElementById('shared-tree-photos')?.textContent || '{}');
+function readLinkPhotos(hash) {
+  if (!hash.startsWith('#tree=') || hash.length > 24000) return {};
+  try {
+    return Object.fromEntries(Object.entries(JSON.parse(atob(hash.slice(6)))).filter(([index, url]) =>
+      /^(?:[0-9]|1[0-4])$/.test(index) && typeof url === 'string' &&
+      /^data:image\/jpeg;base64,[A-Za-z0-9+/]+=*$/.test(url)));
+  } catch {
+    return {};
+  }
+}
+const sharedPhotos = {
+  ...JSON.parse(document.getElementById('shared-tree-photos')?.textContent || '{}'),
+  ...readLinkPhotos(location.hash)
+};
 const photoDatabase = new Promise((resolve, reject) => {
   if (Object.keys(sharedPhotos).length) return resolve(null);
   const request = indexedDB.open('christmas-magic', 1);
@@ -231,6 +246,57 @@ function buildSharedPage(source, images) {
   const tag = '<script id="shared-tree-photos" type="application/json">' + payload + '</' + 'script>';
   return page.replace(mainScript, () => tag + '\n<script>');
 }
+async function thumbnail(source, size, quality) {
+  const image = new Image();
+  image.src = source;
+  await image.decode();
+  const ratio = Math.min(1, size / Math.max(image.naturalWidth,image.naturalHeight));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * ratio));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * ratio));
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(image,0,0,canvas.width,canvas.height);
+  return canvas.toDataURL('image/jpeg',quality);
+}
+const onlineButton = document.getElementById('share-online');
+const linkField = document.getElementById('share-url');
+const copyStatus = document.getElementById('copy-status');
+onlineButton.onclick = async () => {
+  onlineButton.disabled = true;
+  try {
+    await restoredPhotos;
+    const indexes = [...new Set([...Object.keys(sharedPhotos).map(Number), ...photoBlobs.keys()])];
+    if (!indexes.length) return showPhotoStatus('请先更换一个挂饰的照片。');
+    const url = new URL('https://xuannningxu.github.io/christmas-magic/?view=tree');
+    for (const [size,quality] of [[220,.65],[150,.52],[100,.45],[72,.4]]) {
+      const entries = await Promise.all(indexes.map(async index => [index,await thumbnail(photos[index],size,quality)]));
+      url.hash = 'tree=' + btoa(JSON.stringify(Object.fromEntries(entries)));
+      if (url.hash.length <= 24000) {
+        linkField.value = url.href;
+        copyStatus.textContent = '如微信截断链接，请复制完整链接到 Safari 或 Chrome。';
+        document.getElementById('link-dialog').showModal();
+        return;
+      }
+    }
+    showPhotoStatus('照片超出链接容量，请用「导出网页文件」分享。');
+  } catch {
+    showPhotoStatus('生成链接失败，请确认挂饰照片能正常打开。');
+  } finally {
+    onlineButton.disabled = false;
+  }
+};
+document.getElementById('copy-url').onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(linkField.value);
+    copyStatus.textContent = '链接已复制。';
+  } catch {
+    linkField.focus();
+    linkField.select();
+    copyStatus.textContent = '请长按链接并选择复制。';
+  }
+};
 const shareButton = document.getElementById('share-tree');
 shareButton.onclick = async () => {
   shareButton.disabled = true;
