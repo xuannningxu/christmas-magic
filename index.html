@@ -68,6 +68,8 @@ main{grid-template-columns:minmax(0,1fr)}
 <button id="camera">开启摄像头</button>
 </div>
 <button id="tip-button" aria-haspopup="dialog"><span aria-hidden="true">💛</span><span aria-hidden="true">😛&nbsp;</span>支持 Xxnefeli</button>
+<button id="share-tree" type="button">分享我的圣诞树</button>
+<p id="photo-save-status" role="status" hidden></p>
 <p id="status" role="status">Camera off · Manual controls available</p>
 </footer>
 <video id="preview" playsinline muted hidden aria-label="Mirrored camera preview"></video>
@@ -175,6 +177,82 @@ const photo = gallery.querySelector('img');
 const photoInput = gallery.querySelector('input');
 const photos = [1018, 1036, 1043, 106, 1044, 1015, 1016, 1020, 1024, 1039, 1050, 1056, 1069, 1074, 1084].map(id => 'https://picsum.photos/id/' + id + '/960/700');
 const customPhotos = new Map();
+const photoBlobs = new Map();
+const photoSaveStatus = document.getElementById('photo-save-status');
+const sharedPhotos = JSON.parse(document.getElementById('shared-tree-photos')?.textContent || '{}');
+const photoDatabase = new Promise((resolve, reject) => {
+  if (Object.keys(sharedPhotos).length) return resolve(null);
+  const request = indexedDB.open('christmas-magic', 1);
+  request.onupgradeneeded = () => request.result.createObjectStore('ornament-photos');
+  request.onsuccess = () => resolve(request.result);
+  request.onerror = () => reject(request.error);
+  request.onblocked = () => reject(new Error('Photo database blocked'));
+});
+function showPhotoStatus(message) {
+  photoSaveStatus.hidden = false;
+  photoSaveStatus.textContent = message;
+}
+function installPhoto(index, blob) {
+  const previous = customPhotos.get(index);
+  const url = URL.createObjectURL(blob);
+  customPhotos.set(index, url);
+  photoBlobs.set(index, blob);
+  photos[index] = url;
+  if (gallery.open && selectedPhoto === index) photo.src = url;
+  if (previous) URL.revokeObjectURL(previous);
+}
+for (const [index, url] of Object.entries(sharedPhotos)) photos[Number(index)] = url;
+const restoredPhotos = photoDatabase.then(db => db && new Promise((resolve, reject) => {
+  const request = db.transaction('ornament-photos').objectStore('ornament-photos').openCursor();
+  request.onerror = () => reject(request.error);
+  request.onsuccess = () => {
+    const entry = request.result;
+    if (!entry) return resolve();
+    if (!Object.hasOwn(sharedPhotos, entry.key) && !photoBlobs.has(entry.key)) installPhoto(entry.key, entry.value);
+    entry.continue();
+  };
+})).catch(() => showPhotoStatus('当前浏览器无法读取本机照片。'));
+
+function dataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+const shareButton = document.getElementById('share-tree');
+shareButton.onclick = async () => {
+  shareButton.disabled = true;
+  try {
+    await restoredPhotos;
+    if (!photoBlobs.size && !Object.keys(sharedPhotos).length) {
+      showPhotoStatus('先打开一个挂饰并更换照片，再导出分享文件。');
+      return;
+    }
+    const response = await fetch(location.href);
+    if (!response.ok) throw new Error('Could not read page');
+    const source = (await response.text()).replace(/<script id="shared-tree-photos" type="application\/json">.*?<\/script>/s, '');
+    const entries = await Promise.all([...photoBlobs].map(async ([index, blob]) => [index, await dataUrl(blob)]));
+    const payload = JSON.stringify({...sharedPhotos, ...Object.fromEntries(entries)});
+    const tag = '<script id="shared-tree-photos" type="application/json">' + payload + '</' + 'script>';
+    if (!source.includes('<script>')) throw new Error('Page script missing');
+    const file = new Blob([source.replace('<script>', () => tag + '<script>')], {type:'text/html'});
+    const url = URL.createObjectURL(file);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = '我的圣诞树.html';
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    showPhotoStatus('已导出带照片的网页。把下载的 HTML 文件发给对方即可。');
+  } catch {
+    showPhotoStatus('导出失败。请在浏览器打开 GitHub Pages 在线版后再试。');
+  } finally {
+    shareButton.disabled = false;
+  }
+};
 let selectedPhoto = 0;
 function openPhoto(index) {
   if (gallery.open || target) return;
@@ -187,13 +265,27 @@ function openPhoto(index) {
   if (typeof gallery.showModal === 'function') gallery.showModal();
   else gallery.setAttribute('open', '');
 }
-photoInput.onchange = () => {
+photoInput.onchange = async () => {
   const file = photoInput.files[0];
   if (!file) return;
-  if (customPhotos.has(selectedPhoto)) URL.revokeObjectURL(customPhotos.get(selectedPhoto));
-  const url = URL.createObjectURL(file);
-  customPhotos.set(selectedPhoto, url);
-  photo.src = photos[selectedPhoto] = url;
+  const index = selectedPhoto;
+  installPhoto(index, file);
+  if (Object.keys(sharedPhotos).length) {
+    showPhotoStatus('照片已替换，请从在线版导出新的分享文件。');
+    return;
+  }
+  try {
+    const db = await photoDatabase;
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction('ornament-photos', 'readwrite');
+      transaction.oncomplete = resolve;
+      transaction.onabort = () => reject(transaction.error);
+      transaction.objectStore('ornament-photos').put(file, index);
+    });
+    if (photoBlobs.get(index) === file) showPhotoStatus('照片已保存到当前浏览器。');
+  } catch {
+    if (photoBlobs.get(index) === file) showPhotoStatus('本机保存失败，仍可尝试导出分享文件。');
+  }
 };
 gallery.querySelector('form').onsubmit = event => {
   if (typeof gallery.close === 'function') return;
