@@ -58,6 +58,7 @@ main{grid-template-columns:minmax(0,1fr)}
 </head>
 <body>
 <main>
+<noscript><p>当前文件预览无法运行交互。请保存 HTML 后，用电脑上的 Edge 或 Chrome 打开。</p></noscript>
 <header><span class="eyebrow">冬日手势互动</span><h1>Merry Christmas</h1><p class="creator">创意 · Xxnefeli</p></header>
 <div id="scene" aria-hidden="true"></div>
 <footer>
@@ -221,6 +222,15 @@ function dataUrl(blob) {
     reader.readAsDataURL(blob);
   });
 }
+function buildSharedPage(source, images) {
+  const previous = /^<script id="shared-tree-photos" type="application\/json">[^\n]*<\/script>\r?\n/m;
+  const mainScript = /^<script>\r?$/m;
+  const page = source.replace(previous, '');
+  if (!mainScript.test(page)) throw new Error('Page script missing');
+  const payload = JSON.stringify(images).replace(/</g, '\\u003c');
+  const tag = '<script id="shared-tree-photos" type="application/json">' + payload + '</' + 'script>';
+  return page.replace(mainScript, () => tag + '\n<script>');
+}
 const shareButton = document.getElementById('share-tree');
 shareButton.onclick = async () => {
   shareButton.disabled = true;
@@ -232,12 +242,10 @@ shareButton.onclick = async () => {
     }
     const response = await fetch(location.href);
     if (!response.ok) throw new Error('Could not read page');
-    const source = (await response.text()).replace(/<script id="shared-tree-photos" type="application\/json">.*?<\/script>/s, '');
+    const source = await response.text();
     const entries = await Promise.all([...photoBlobs].map(async ([index, blob]) => [index, await dataUrl(blob)]));
-    const payload = JSON.stringify({...sharedPhotos, ...Object.fromEntries(entries)});
-    const tag = '<script id="shared-tree-photos" type="application/json">' + payload + '</' + 'script>';
-    if (!source.includes('<script>')) throw new Error('Page script missing');
-    const file = new Blob([source.replace('<script>', () => tag + '<script>')], {type:'text/html'});
+    const page = buildSharedPage(source, {...sharedPhotos, ...Object.fromEntries(entries)});
+    const file = new Blob([page], {type:'text/html'});
     const url = URL.createObjectURL(file);
     const link = document.createElement('a');
     link.href = url;
