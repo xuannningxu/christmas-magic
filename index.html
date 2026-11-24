@@ -54,13 +54,33 @@ main{grid-template-columns:minmax(0,1fr)}
 #tip-dialog{width:min(90vw,400px)}
 #tip-dialog img{aspect-ratio:1;max-height:55svh}
 #tip-dialog:not([open]){display:none}
+
+#scene{isolation:isolate}
+.winter-ground,.winter-snow{position:absolute;pointer-events:none}
+.winter-ground{z-index:-1;left:50%;bottom:8%;width:min(78%,760px);height:19%;transform:translateX(-50%);
+  background:radial-gradient(ellipse at 50% 50%,#e6b97d32,transparent 49%),
+    radial-gradient(ellipse at 29% 64%,#a7c7e226,transparent 53%),
+    radial-gradient(ellipse at 73% 60%,#b7cce426,transparent 56%),
+    radial-gradient(ellipse at 51% 69%,#d8e8f729,transparent 65%);
+  filter:blur(3px)}
+.winter-ground::after{content:"";position:absolute;inset:35% 9% 0;
+  background:radial-gradient(circle,#eaf4ff 0 1px,transparent 1.5px) 0 0/23px 13px,
+    radial-gradient(circle,#ffdca4 0 1px,transparent 1.4px) 7px 8px/31px 19px;
+  mask-image:radial-gradient(ellipse,#000 2%,transparent 68%);opacity:.25}
+.winter-snow{inset:0;z-index:0;overflow:hidden;mask-image:linear-gradient(transparent,#000 15%,#000 82%,transparent)}
+.winter-snow i{position:absolute;left:var(--x);top:-3%;width:var(--size);height:var(--size);border-radius:50%;
+  color:#e0efff;background:currentColor;box-shadow:0 0 6px currentColor;opacity:0;
+  animation:winter-fall var(--duration) var(--delay) linear infinite}
+@keyframes winter-fall{0%{top:-3%;opacity:0}15%{opacity:.48}82%{opacity:.36}100%{top:103%;transform:translateX(var(--drift));opacity:0}}
+@media(prefers-reduced-motion:reduce){.winter-snow{display:none}}
+@media(max-width:520px){.winter-ground{bottom:13%;width:95%}.winter-snow i:nth-child(3n){display:none}}
 </style>
 </head>
 <body>
 <main>
 <noscript><p>当前文件预览无法运行交互。请保存 HTML 后，用电脑上的 Edge 或 Chrome 打开。</p></noscript>
 <header><span class="eyebrow">冬日手势互动</span><h1>Merry Christmas</h1><p class="creator">创意 · Xxnefeli</p></header>
-<div id="scene" aria-hidden="true"></div>
+<div id="scene" aria-hidden="true"><div class="winter-ground"></div><div class="winter-snow"><i style="--x:9%;--size:3px;--duration:11s;--delay:-0s;--drift:-12px"></i><i style="--x:46%;--size:2px;--duration:18s;--delay:-13s;--drift:13px"></i><i style="--x:83%;--size:2px;--duration:11s;--delay:-3s;--drift:-14px"></i><i style="--x:20%;--size:2px;--duration:18s;--delay:-16s;--drift:15px"></i><i style="--x:57%;--size:2px;--duration:11s;--delay:-6s;--drift:-16px"></i><i style="--x:94%;--size:2px;--duration:18s;--delay:-19s;--drift:17px"></i><i style="--x:31%;--size:2px;--duration:11s;--delay:-9s;--drift:-18px"></i><i style="--x:68%;--size:3px;--duration:18s;--delay:-22s;--drift:19px"></i><i style="--x:5%;--size:2px;--duration:11s;--delay:-12s;--drift:-20px"></i><i style="--x:42%;--size:2px;--duration:18s;--delay:-2s;--drift:21px"></i><i style="--x:79%;--size:2px;--duration:11s;--delay:-15s;--drift:-22px"></i><i style="--x:16%;--size:2px;--duration:18s;--delay:-5s;--drift:23px"></i><i style="--x:53%;--size:2px;--duration:11s;--delay:-18s;--drift:-24px"></i><i style="--x:90%;--size:2px;--duration:18s;--delay:-8s;--drift:25px"></i><i style="--x:27%;--size:3px;--duration:11s;--delay:-21s;--drift:-26px"></i><i style="--x:64%;--size:2px;--duration:18s;--delay:-11s;--drift:27px"></i><i style="--x:1%;--size:2px;--duration:11s;--delay:-1s;--drift:-28px"></i><i style="--x:38%;--size:2px;--duration:18s;--delay:-14s;--drift:29px"></i><i style="--x:75%;--size:2px;--duration:11s;--delay:-4s;--drift:-12px"></i><i style="--x:12%;--size:2px;--duration:18s;--delay:-17s;--drift:13px"></i><i style="--x:49%;--size:2px;--duration:11s;--delay:-7s;--drift:-14px"></i><i style="--x:86%;--size:3px;--duration:18s;--delay:-20s;--drift:15px"></i><i style="--x:23%;--size:2px;--duration:11s;--delay:-10s;--drift:-16px"></i><i style="--x:60%;--size:2px;--duration:18s;--delay:-0s;--drift:17px"></i></div></div>
 <footer>
 <p id="hint">张手散开 · 握拳聚拢 · 收拇指、掌心左右移动转树 · 双指开合缩放 · 食指瞄准后捏合打开挂饰</p>
 <div class="controls">
