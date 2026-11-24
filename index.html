@@ -64,26 +64,47 @@ main{grid-template-columns:minmax(0,1fr)}
 @keyframes winter-fall{0%{top:-3%;opacity:0}15%{opacity:.48}82%{opacity:.36}100%{top:103%;transform:translateX(var(--drift));opacity:0}}
 @media(prefers-reduced-motion:reduce){.winter-snow{display:none}}
 @media(max-width:520px){.winter-snow i:nth-child(3n){display:none}}
+
+.gesture-start{pointer-events:auto;margin:.75rem auto 0;max-width:32rem;padding-inline:.45rem}
+.gesture-intro{margin:0 0 .45rem;font-size:.92rem;font-weight:650;color:#ffe5b6}
+#camera{min-height:46px;padding:.65rem 1.35rem;background:linear-gradient(135deg,#fff0b6,#e5a55c);color:#281609;border-color:#ffe0a1;font-weight:750;box-shadow:0 0 20px #e8a24e50}
+#camera:hover{background:#fff2c8}
+.gesture-start #status{margin:.44rem auto .36rem;font-size:.78rem;line-height:1.4}
+.gesture-basics{display:flex;flex-wrap:wrap;justify-content:center;gap:.35rem .8rem;font-size:.85rem;color:#f0d4ad}
+.gesture-basics b{margin-right:.15rem}
+.gesture-more{margin:.35rem auto 0;color:#e3bd8f;font-size:.8rem}
+.gesture-more summary{cursor:pointer;width:max-content;margin:auto;padding:.25rem}
+.gesture-more ul{display:table;text-align:left;margin:.2rem auto .4rem;padding-left:1.25rem;line-height:1.65}
+@media(max-width:680px){video{top:auto;bottom:1rem}}
 </style>
 </head>
 <body>
 <main>
 <noscript><p>当前文件预览无法运行交互。请保存 HTML 后，用电脑上的 Edge 或 Chrome 打开。</p></noscript>
-<header><span class="eyebrow">冬日手势互动</span><h1>Merry Christmas</h1><p class="creator">创意 · Xxnefeli</p></header>
+<header><span class="eyebrow">冬日手势互动</span><h1>Merry Christmas</h1><p class="creator">创意 · Xxnefeli</p><section class="gesture-start" aria-label="摄像头手势玩法">
+<p class="gesture-intro">用手势操控圣诞树</p>
+<button id="camera" type="button" aria-describedby="status">开启摄像头</button>
+<p id="status" role="status">点击开启，允许摄像头权限后把一只手放进画面</p>
+<div class="gesture-basics"><span><b>🖐️</b> 张手散开</span><span><b>✊</b> 握拳聚拢</span></div>
+<details class="gesture-more"><summary>更多手势玩法</summary>
+<ul><li>收起拇指，左右移动掌心转树</li><li>食指和中指开合缩放</li><li>用食指瞄准挂饰，再捏合打开照片</li></ul>
+</details>
+</section></header>
 <div id="scene" aria-hidden="true"><div class="winter-snow"><i style="--x:9%;--size:3px;--duration:11s;--delay:-0s;--drift:-12px"></i><i style="--x:46%;--size:2px;--duration:18s;--delay:-13s;--drift:13px"></i><i style="--x:83%;--size:2px;--duration:11s;--delay:-3s;--drift:-14px"></i><i style="--x:20%;--size:2px;--duration:18s;--delay:-16s;--drift:15px"></i><i style="--x:57%;--size:2px;--duration:11s;--delay:-6s;--drift:-16px"></i><i style="--x:94%;--size:2px;--duration:18s;--delay:-19s;--drift:17px"></i><i style="--x:31%;--size:2px;--duration:11s;--delay:-9s;--drift:-18px"></i><i style="--x:68%;--size:3px;--duration:18s;--delay:-22s;--drift:19px"></i><i style="--x:5%;--size:2px;--duration:11s;--delay:-12s;--drift:-20px"></i><i style="--x:42%;--size:2px;--duration:18s;--delay:-2s;--drift:21px"></i><i style="--x:79%;--size:2px;--duration:11s;--delay:-15s;--drift:-22px"></i><i style="--x:16%;--size:2px;--duration:18s;--delay:-5s;--drift:23px"></i><i style="--x:53%;--size:2px;--duration:11s;--delay:-18s;--drift:-24px"></i><i style="--x:90%;--size:2px;--duration:18s;--delay:-8s;--drift:25px"></i><i style="--x:27%;--size:3px;--duration:11s;--delay:-21s;--drift:-26px"></i><i style="--x:64%;--size:2px;--duration:18s;--delay:-11s;--drift:27px"></i><i style="--x:1%;--size:2px;--duration:11s;--delay:-1s;--drift:-28px"></i><i style="--x:38%;--size:2px;--duration:18s;--delay:-14s;--drift:29px"></i><i style="--x:75%;--size:2px;--duration:11s;--delay:-4s;--drift:-12px"></i><i style="--x:12%;--size:2px;--duration:18s;--delay:-17s;--drift:13px"></i><i style="--x:49%;--size:2px;--duration:11s;--delay:-7s;--drift:-14px"></i><i style="--x:86%;--size:3px;--duration:18s;--delay:-20s;--drift:15px"></i><i style="--x:23%;--size:2px;--duration:11s;--delay:-10s;--drift:-16px"></i><i style="--x:60%;--size:2px;--duration:18s;--delay:-0s;--drift:17px"></i></div></div>
 <footer>
-<p id="hint">张手散开 · 握拳聚拢 · 收拇指、掌心左右移动转树 · 双指开合缩放 · 食指瞄准后捏合打开挂饰</p>
+<p id="hint">拖动转树 · 点击挂饰看照片</p>
+
 <div class="controls">
 <button id="gather" aria-pressed="true">聚拢</button>
 <button id="scatter" aria-pressed="false">散开</button>
-<button id="camera">开启摄像头</button>
+
 </div>
 <button id="tip-button" aria-haspopup="dialog"><span aria-hidden="true">💛</span><span aria-hidden="true">😛&nbsp;</span>支持 Xxnefeli</button>
 <button id="share-tree" type="button">导出网页文件</button>
 <button id="send-tree-file" type="button" hidden>发送已导出的文件</button>
 <button id="share-online">分享我的圣诞树链接</button>
 <p id="photo-save-status" role="status" hidden></p>
-<p id="status" role="status">Camera off · Manual controls available</p>
+
 </footer>
 <video id="preview" playsinline muted hidden aria-label="Mirrored camera preview"></video>
 </main>
@@ -790,7 +811,7 @@ async function closeHands(run) {
 
 cameraButton.onclick = async () => {
   if (session) {
-    stopCamera('Camera off · Manual controls available');
+    stopCamera('摄像头已关闭 · 可点击按钮或拖动转树');
     return;
   }
   if (!navigator.mediaDevices?.getUserMedia) {
@@ -836,7 +857,7 @@ cameraButton.onclick = async () => {
         const mode = gestureFilter(gesture, now);
         if (mode) setMode(mode);
       }
-      const message = palmX !== null ? '掌心转树 · 左右移动' : !points ? 'Camera on · Show one hand' : gesture === 'gather' ? 'Camera on · Closed fist' : gesture === 'scatter' ? 'Camera on · Open palm' : 'Camera on · Hold an open palm or closed fist';
+      const message = palmX !== null ? '掌心转树 · 左右移动' : !points ? '手势已开启 · 请把一只手放进画面' : gesture === 'gather' ? 'Camera on · Closed fist' : gesture === 'scatter' ? 'Camera on · Open palm' : 'Camera on · Hold an open palm or closed fist';
       if (status.textContent !== message) status.textContent = message;
     });
     let previousTime = -1;
