@@ -48,7 +48,9 @@ dialog .close-photo{position:absolute;top:1.3rem;right:1.3rem;font-size:1.4rem;b
 .creator{margin:.45rem 0 0;color:#e5b378;font-size:.8rem;letter-spacing:.12em}
 main{grid-template-columns:minmax(0,1fr)}
 @media(max-width:520px){h1{font-size:clamp(1rem,5.8vw,2rem);letter-spacing:.055em}header{padding-inline:.5rem}#hint{font-size:.86rem;overflow-wrap:anywhere}}
-#tip-button{margin-top:.55rem}
+#tip-button{margin-top:.65rem;padding-inline:1.2rem;background:linear-gradient(135deg,#ffe6a5,#e6a459);color:#231409;border-color:#ffde9b;font-weight:700;box-shadow:0 0 18px #eeb46148}
+#tip-button:hover{background:#fff0bc;box-shadow:0 0 24px #eeb46178}
+#tip-button span{margin-inline-end:.35em}
 #tip-dialog{width:min(90vw,400px)}
 #tip-dialog img{aspect-ratio:1;max-height:55svh}
 #tip-dialog:not([open]){display:none}
@@ -65,7 +67,7 @@ main{grid-template-columns:minmax(0,1fr)}
 <button id="scatter" aria-pressed="false">散开</button>
 <button id="camera">开启摄像头</button>
 </div>
-<button id="tip-button" aria-haspopup="dialog">支持 Xxnefeli</button>
+<button id="tip-button" aria-haspopup="dialog"><span aria-hidden="true">💛</span>支持 Xxnefeli</button>
 <p id="status" role="status">Camera off · Manual controls available</p>
 </footer>
 <video id="preview" playsinline muted hidden aria-label="Mirrored camera preview"></video>
