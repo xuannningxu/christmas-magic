@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Merry Christmas • A particle tree</title>
+<style>
+*{box-sizing:border-box}
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#090706;color:#ffedcc}
+body{margin:0}
+main{position:relative;isolation:isolate;display:grid;grid-template-rows:auto 1fr auto;min-height:100svh;background:radial-gradient(ellipse at 50% 53%,#291609 0%,#100a07 43%,#080706 78%);overflow:hidden;text-align:center}
+header{padding:clamp(1.5rem,5vh,3.5rem) 1rem 0;z-index:1;pointer-events:none}
+.eyebrow{font-size:.75rem;letter-spacing:.38em;color:#e5b378}
+h1{margin:.38rem 0 0;font:400 clamp(1.85rem,6.7vw,5.5rem)/1.08 Georgia,serif;letter-spacing:.095em;text-transform:uppercase;text-shadow:0 0 30px #b66b3059}
+#scene{position:relative;min-height:300px}
+canvas{position:absolute;inset:0;display:block;width:100%;height:100%}
+footer{z-index:1;padding:0 1rem max(1rem,env(safe-area-inset-bottom))}
+p{margin:.55rem 0 .8rem}
+#hint{color:#eacba7}
+.controls{display:flex;justify-content:center;flex-wrap:wrap;gap:.5rem}
+button{background:#1c130e;color:#ffe7c2;border:1px solid #745332;border-radius:999px;padding:.65rem 1rem;min-height:44px;font:inherit;cursor:pointer}
+button[aria-pressed=true],button:hover:not(:disabled){background:#e8b36e;color:#201209}
+button:focus-visible{outline:2px solid #fff1d6;outline-offset:3px}
+button:disabled{opacity:.55;cursor:default}
+#status{font-size:.83rem;color:#d2aa83;min-height:1.4em;margin-bottom:0}
+video{z-index:2;position:absolute;bottom:1rem;right:1rem;width:clamp(64px,11vw,155px);aspect-ratio:4/3;object-fit:cover;transform:scaleX(-1);border:1px solid #745332;border-radius:10px}
+@media(max-width:680px){video{bottom:auto;top:6.1rem;right:.6rem}button{padding-inline:.76rem}}
+.zoom-control{display:inline-flex;align-items:center;gap:.5rem;margin-top:.55rem;color:#eed2a9;font-size:.85rem}
+.zoom-control input{width:clamp(95px,25vw,175px);accent-color:#edae64}
+.photo-ornament{position:absolute;translate:-50% -50%;z-index:1;width:36px;height:36px;min-height:0;padding:0;border:1px solid var(--gem);background:radial-gradient(circle at 30% 25%,#fff6,#190e12 75%);color:var(--gem);box-shadow:0 0 17px var(--gem),inset 0 0 10px var(--gem);transition:scale .18s}
+.photo-ornament:hover,.photo-ornament.aimed{scale:1.36;color:white;background:#513021}
+.hand-cursor{position:absolute;z-index:3;translate:-50% -50%;width:24px;height:24px;border:2px solid #fff0ca;border-radius:50%;box-shadow:0 0 13px #ffb765;pointer-events:none}
+dialog{width:min(90vw,660px);padding:1rem;border:1px solid #a96c39;border-radius:18px;background:#1b100b;color:#ffedcc;text-align:center;box-shadow:0 0 70px #dd843c69}
+dialog::backdrop{background:#090503c9;backdrop-filter:blur(8px)}
+dialog img{display:block;width:100%;max-height:68svh;aspect-ratio:4/3;object-fit:contain;background:#090605;border-radius:10px}
+dialog .close-photo{position:absolute;top:1.3rem;right:1.3rem;font-size:1.4rem;background:#1b100b}
+.replace{display:flex;gap:.5rem;justify-content:center;align-items:center;flex-wrap:wrap;font-size:.9rem}
+.replace input{max-width:100%}
+
+
+#scene{touch-action:pan-y;cursor:grab}
+#scene:active{cursor:grabbing}
+.photo-ornament{width:34px;height:34px;border:0;background:transparent;box-shadow:none;text-shadow:0 0 9px var(--gem);font-size:1.3rem;line-height:1}
+.photo-ornament:hover,.photo-ornament.aimed{background:#f5c16b25}
+.photo-ornament.ornament-0{width:24px;height:24px;border:1px solid #fff7;background:radial-gradient(circle at 28% 25%,#fff9,var(--gem) 34%,#421622 86%);box-shadow:0 0 12px var(--gem)}
+.ornament-0::before{content:'';position:absolute;top:-5px;left:8px;width:6px;height:5px;background:#ffe3a0;border-radius:2px}
+.ornament-3,.ornament-5{color:var(--gem)}
+.creator{margin:.45rem 0 0;color:#e5b378;font-size:.8rem;letter-spacing:.12em}
+</style>
+</head>
+<body>
+<main>
+<header><span class="eyebrow">冬日手势互动</span><h1>Merry Christmas</h1><p class="creator">创意 · Xxnefeli</p></header>
+<div id="scene" aria-hidden="true"></div>
+<footer>
+<p id="hint">张手散开 · 握拳聚拢 · 收拇指、掌心左右移动转树 · 双指开合缩放 · 食指瞄准后捏合打开挂饰</p>
+<div class="controls">
+<button id="gather" aria-pressed="true">聚拢</button>
+<button id="scatter" aria-pressed="false">散开</button>
+<button id="camera">开启摄像头</button>
+</div>
+<p id="status" role="status">Camera off · Manual controls available</p>
+</footer>
+<video id="preview" playsinline muted hidden aria-label="Mirrored camera preview"></video>
+</main>
+<script>
+function classify(points) {
+  if (!points || points.length < 21) return null;
+  const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+  const wrist = points[0];
+  const palm = distance(wrist, points[9]);
+  if (!palm) return null;
+  let extended = 0;
+  let curled = 0;
+  for (const base of [5, 9, 13, 17]) {
+    const joint = points[base + 1];
+    const tip = points[base + 3];
+    const reach = distance(tip, wrist) / distance(joint, wrist);
+    if (reach > 1.17 && distance(tip, points[base]) > palm * .48) extended++;
+    if (reach < 1.05 && distance(tip, points[base]) < palm * .63) curled++;
+  }
+  if (extended === 4) return 'scatter';
+  if (curled === 4) return 'gather';
+  return null;
+}
+
+function debounce(hold = 220, cooldown = 550) {
+  let candidate = null;
+  let since = 0;
+  let last = -Infinity;
+  let emitted = null;
+  return (gesture, now) => {
+    if (gesture !== candidate) {
+      candidate = gesture;
+      since = now;
+    }
+    if (!candidate || candidate === emitted || now - since < hold || now - last < cooldown) return null;
+    last = now;
+    emitted = candidate;
+    return candidate;
+  };
+}
+
+
+const $ = id => document.getElementById(id);
+const sceneHost = $('scene');
+const status = $('status');
+const video = $('preview');
+const cameraButton = $('camera');
+const manual = ['gather', 'scatter'];
+let target = 0;
+let gestureFilter = debounce();
+let manualUntil = 0;
+
+function setMode(mode) {
+  target = Number(mode === 'scatter');
+  for (const name of manual) $(name).setAttribute('aria-pressed', String(name === mode));
+}
+
+for (const name of manual) $(name).onclick = () => {
+  manualUntil = performance.now() + 1100;
+  gestureFilter = debounce();
+  setMode(name);
+};
+
+const gallery = document.createElement('dialog');
+gallery.innerHTML = '<form method="dialog"><button class="close-photo" aria-label="关闭照片">×</button></form><img alt=""><p></p><label class="replace">更换这张照片<input type="file" accept="image/*"></label>';
+document.body.append(gallery);
+const photo = gallery.querySelector('img');
+const photoInput = gallery.querySelector('input');
+const photos = [1018, 1036, 1043, 106, 1044, 1015, 1016, 1020, 1024, 1039, 1050, 1056, 1069, 1074, 1084].map(id => 'https://picsum.photos/id/' + id + '/960/700');
+const customPhotos = new Map();
+let selectedPhoto = 0;
+function openPhoto(index) {
+  if (gallery.open || target) return;
+  selectedPhoto = index;
+  photo.src = photos[index];
+  photo.alt = '挂饰照片 ' + (index + 1);
+  gallery.querySelector('p').textContent = photo.alt;
+  photoInput.value = '';
+  if (typeof gallery.showModal === 'function') gallery.showModal();
+  else gallery.setAttribute('open', '');
+}
+photoInput.onchange = () => {
+  const file = photoInput.files[0];
+  if (!file) return;
+  if (customPhotos.has(selectedPhoto)) URL.revokeObjectURL(customPhotos.get(selectedPhoto));
+  const url = URL.createObjectURL(file);
+  customPhotos.set(selectedPhoto, url);
+  photo.src = photos[selectedPhoto] = url;
+};
+gallery.querySelector('form').onsubmit = event => {
+  if (typeof gallery.close === 'function') return;
+  event.preventDefault();
+  gallery.removeAttribute('open');
+  gallery.onclose();
+};
+gallery.onclick = event => {
+  if (event.target === gallery && typeof gallery.close === 'function') gallery.close();
+};
+gallery.onclose = () => {
+  gestureFilter = debounce();
+  manualUntil = performance.now() + 300;
+};
+
+let zoomTarget = 1;
+const zoomInput = document.createElement('input');
+Object.assign(zoomInput, {type:'range', min:'.7', max:'2.1', step:'.01', value:'1'});
+zoomInput.setAttribute('aria-label', '缩放圣诞树');
+zoomInput.oninput = () => setZoom(Number(zoomInput.value));
+const zoomLabel = document.createElement('label');
+zoomLabel.className = 'zoom-control';
+zoomLabel.append('缩放', zoomInput);
+document.querySelector('.controls').after(zoomLabel);
+function setZoom(value) {
+  zoomTarget = Math.max(.7, Math.min(2.1, value));
+  zoomInput.value = zoomTarget;
+}
+sceneHost.addEventListener('wheel', event => {
+  event.preventDefault();
+  setZoom(zoomTarget * Math.exp(-event.deltaY * .0012));
+}, {passive:false});
+
+const decorations = ['彩球','铃铛','礼盒','雪花','糖果','星星'];
+let treeAngle = 0;
+let palmX = null;
+let drag = null;
+sceneHost.addEventListener('pointerdown', event => {
+  if (event.target.closest('button') || !event.isPrimary || event.button !== 0) return;
+  drag = {id:event.pointerId, x:event.clientX};
+  sceneHost.setPointerCapture(event.pointerId);
+});
+sceneHost.addEventListener('pointermove', event => {
+  if (drag?.id !== event.pointerId) return;
+  treeAngle += (event.clientX - drag.x) * .013;
+  drag.x = event.clientX;
+});
+sceneHost.addEventListener('lostpointercapture', () => { drag = null; });
+const anchors = photos.map((_, i) => {
+  const y = 1.79 - i * .238;
+  const angle = i * 2.39996;
+  const radius = (2.32-y) * .41;
+  return [Math.sin(angle)*radius,y,Math.cos(angle)*radius];
+});
+function placeOrnament(button, x, y, depth, width, height, visible) {
+  button.hidden = !visible || depth < -.1 || x < 18 || x > width-18 || y < 18 || y > height-18;
+  button.style.left = x+'px';
+  button.style.top = y+'px';
+}
+const ornaments = photos.map((_, index) => {
+  const button = document.createElement('button');
+  button.className = 'photo-ornament ornament-' + index % decorations.length;
+  button.type = 'button';
+  button.setAttribute('aria-label', decorations[index % decorations.length] + ' · 打开照片 ' + (index + 1));
+  button.style.setProperty('--gem', ['#ff6b8b','#70ffcf','#80bdff','#ff9cec','#ffda81'][index % 5]);
+  button.textContent = ['', '🔔', '🎁', '❄', '🍬', '★'][index % decorations.length];
+  button.hidden = true;
+  button.onclick = () => openPhoto(index);
+  sceneHost.append(button);
+  return button;
+});
+const cursor = document.createElement('div');
+cursor.className = 'hand-cursor';
+cursor.hidden = true;
+sceneHost.append(cursor);
+let pinchLatched = false;
+let pointedPhoto = -1;
+let zoomAnchor = null;
+let previousCursor = null;
+function clearPointer() {
+  cursor.hidden = true;
+  previousCursor = null;
+  if (pointedPhoto >= 0) ornaments[pointedPhoto].classList.remove('aimed');
+  pointedPhoto = -1;
+}
+function handleHand(landmarks, world) {
+  if (!landmarks || !world || gallery.open || target) {
+    clearPointer();
+    zoomAnchor = null;
+    palmX = null;
+    return;
+  }
+  const distance = (a,b) => Math.hypot(world[a].x-world[b].x, world[a].y-world[b].y, world[a].z-world[b].z);
+  const raised = base => distance(base+3,0) > distance(base+1,0)*1.12;
+  const index = raised(5), middle = raised(9), ring = raised(13), pinky = raised(17);
+  const palm = distance(0,9);
+  if (!palm) return;
+  const thumbTucked = distance(4,5)/palm < .56 && distance(4,9)/palm < .8;
+  if (index && middle && ring && pinky && thumbTucked) {
+    clearPointer();
+    zoomAnchor = null;
+    const x = 1-landmarks[9].x;
+    if (palmX !== null) treeAngle += Math.max(-.09,Math.min(.09,(x-palmX)*7.5));
+    palmX = x;
+    return;
+  }
+  palmX = null;
+
+  if (index && middle && !ring && !pinky) {
+    clearPointer();
+    const spread = distance(8,12)/palm;
+    zoomAnchor ??= {spread, zoom:zoomTarget};
+    setZoom(zoomAnchor.zoom * Math.exp((spread - zoomAnchor.spread)*1.55));
+    return;
+  }
+  zoomAnchor = null;
+  const pinched = distance(4,8)/palm < .28;
+  if (distance(4,8)/palm > .43) pinchLatched = false;
+  if (pinched) {
+    if (!pinchLatched && pointedPhoto >= 0) openPhoto(pointedPhoto);
+    pinchLatched = true;
+    return;
+  }
+  if (!index || middle || ring || pinky) {
+    clearPointer();
+    return;
+  }
+  const clamp = n => Math.min(1,Math.max(0,n));
+  const x = clamp((1-landmarks[8].x-.14)/.72)*sceneHost.clientWidth;
+  const y = clamp((landmarks[8].y-.14)/.72)*sceneHost.clientHeight;
+  const next = previousCursor ? {x:previousCursor.x*.64+x*.36,y:previousCursor.y*.64+y*.36} : {x,y};
+  previousCursor = next;
+  cursor.hidden = false;
+  cursor.style.left = next.x + 'px';
+  cursor.style.top = next.y + 'px';
+  clearAim();
+  let best = 46;
+  ornaments.forEach((button, i) => {
+    if (button.hidden) return;
+    const d = Math.hypot(button.offsetLeft-next.x,button.offsetTop-next.y);
+    if (d < best) { best = d; pointedPhoto = i; }
+  });
+  if (pointedPhoto >= 0) ornaments[pointedPhoto].classList.add('aimed');
+}
+function clearAim() {
+  if (pointedPhoto >= 0) ornaments[pointedPhoto].classList.remove('aimed');
+  pointedPhoto = -1;
+}
+
+async function buildScene() {
+  const T = await importThree();
+  const renderer = new T.WebGLRenderer({ alpha: true, antialias: false });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  sceneHost.append(renderer.domElement);
+  const scene = new T.Scene();
+  const camera = new T.OrthographicCamera();
+  camera.position.set(0, .65, 10);
+  camera.lookAt(0, 0, 0);
+  const geometry = new T.BufferGeometry();
+  const start = [], end = [], colors = [], samples = [];
+  const gold = ['#ffcc69', '#e59336', '#f7b546', '#fff1b2', '#a55820'];
+  const bulbs = ['#ff455f', '#54f8cc', '#66aaff', '#ff78d4', '#fff1a2'];
+  const rand = Math.random;
+  const tau = 2 * Math.PI;
+  function point(x, y, z, color, size, background = 0) {
+    start.push(x, y, z);
+    const angle = rand() * tau;
+    const distance = .6 + 4.7 * Math.pow(rand(), .62);
+    end.push(background ? x : Math.cos(angle) * distance,
+      background ? y : (rand() - .5) * 6.2, background ? z : Math.sin(angle) * distance);
+    const c = new T.Color(color);
+    colors.push(c.r, c.g, c.b);
+    samples.push(size, rand() * tau, background);
+  }
+  for (let i = 0; i < 12800; i++) {
+    const h = Math.pow(rand(), 1.24);
+    const angle = rand() * tau;
+    const tier = (h * 8) % 1;
+    const radius = (1 - h) * (1.83 - .42 * tier) * (.47 + .53 * Math.sqrt(rand()));
+    point(Math.cos(angle) * radius, -2.04 + h * 4.36, Math.sin(angle) * radius,
+      gold[i % gold.length], .85 + rand() * 2.45);
+  }
+  for (let i = 0; i < 1950; i++) {
+    const h = i / 1950;
+    const angle = h * tau * 7.2;
+    const radius = 1.84 * (1 - h) + .025;
+    point(Math.cos(angle) * radius, -2.01 + h * 4.27, Math.sin(angle) * radius,
+      i % 43 < 3 ? bulbs[Math.floor(i / 43) % bulbs.length] : '#ffd78c', i % 43 < 3 ? 5 : 1.8);
+  }
+  for (let i = 0; i < 54; i++) {
+    const h = .035 + rand() * .78;
+    const angle = rand() * tau;
+    const radius = (1 - h) * 1.79;
+    const x = Math.cos(angle) * radius, z = Math.sin(angle) * radius;
+    const scale = .034 + rand() * .038;
+    for (let j = 0; j < 32; j++) {
+      const a = rand() * tau, b = rand() * 2 - 1, r = Math.sqrt(1 - b * b);
+      point(x + Math.cos(a) * r * scale, -2.04 + h * 4.36 + b * scale,
+        z + Math.sin(a) * r * scale, bulbs[i % bulbs.length], 2 + rand() * 2.6);
+    }
+  }
+  for (let i = 0; i < 1100; i++) {
+    const a = rand() * tau;
+    const r = Math.sqrt(rand()) * 2.65;
+    point(Math.cos(a) * r, -2.26 + rand() * .045, Math.sin(a) * r, '#d3954e', .7 + rand() * 1.85, 1);
+  }
+  for (let i = 0; i < 450; i++) {
+    point((rand() - .5) * 16, (rand() - .5) * 7, -3 - rand() * 3, '#b78247', .8 + rand() * 2.3, 1);
+  }
+  for (let i = 0; i < 500; i++) {
+    const a = rand() * 10;
+    const j = Math.floor(a);
+    const angle = j * tau / 10;
+    const next = (j + 1) * tau / 10;
+    const r1 = j % 2 ? .145 : .36, r2 = j % 2 ? .36 : .145;
+    const t = a - j, fill = Math.sqrt(rand());
+    point((Math.sin(angle) * r1 * (1-t) + Math.sin(next) * r2 * t) * fill,
+      2.49 + (Math.cos(angle) * r1 * (1-t) + Math.cos(next) * r2 * t) * fill,
+      (rand() - .5) * .08, '#ffe5a0', 1.4 + rand() * 3.8);
+  }
+  for (const [name, values] of Object.entries({ position: start, destination: end, tint: colors, sampleData: samples })) {
+    geometry.setAttribute(name, new T.Float32BufferAttribute(values, 3));
+  }
+  const uniforms = { time: {value: 0}, progress: {value: 0}, spin: {value: 0}, pixelRatio: {value: 1}, scale: {value: 1} };
+  const material = new T.ShaderMaterial({
+    uniforms, transparent: true, depthWrite: false, blending: T.AdditiveBlending,
+    vertexShader: `
+      attribute vec3 destination;
+      attribute vec3 tint;
+      attribute vec3 sampleData;
+      uniform float time, progress, spin, pixelRatio, scale;
+      varying vec3 light;
+      varying float intensity;
+      void main() {
+        float phase = sampleData.y;
+        float background = sampleData.z;
+        float p = smoothstep(0.0, 1.0, progress);
+        vec3 pos = mix(position, destination, p);
+        pos += p * (1.0 - background) * vec3(
+          sin(time * .83 + phase), cos(time * .66 + phase), sin(time * .72 + phase * 2.0)
+        ) * (.17 + .65 * sin(p * 3.14159));
+        float angle = spin * (1.0 - background);
+        mat2 turn = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
+        // Keep the star facing the viewer when the tree is assembled.
+        if (position.y > 2.34 && background < .5) angle *= p;
+        pos.xz = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * pos.xz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        float twinkle = pow(.5 + .5 * sin(time * (1.7 + phase * .35) + phase * 9.0), 3.0);
+        gl_PointSize = max(1.0, pixelRatio * scale * sampleData.x * (1.15 + twinkle * .6 + p * .25));
+        light = tint;
+        intensity = mix(.65, .27, background) * (.35 + .65 * twinkle);
+      }`,
+    fragmentShader: `
+      varying vec3 light;
+      varying float intensity;
+      void main() {
+        float r = length(gl_PointCoord - .5) * 2.0;
+        float glow = exp(-r*r*4.5) * (1.0 - smoothstep(.72, 1.0, r));
+        float core = exp(-r*r*19.0);
+        gl_FragColor = vec4(light + vec3(core * .27), (glow * .76 + core * .24) * intensity);
+        #include <colorspace_fragment>
+      }`
+  });
+  const cloud = new T.Points(geometry, material);
+  cloud.frustumCulled = false;
+  scene.add(cloud);
+  new ResizeObserver(() => {
+    const {clientWidth: w, clientHeight: h} = sceneHost;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    const halfWidth = Math.max(2.13, 3.18 * w / h);
+    const halfHeight = halfWidth * h / w;
+    Object.assign(camera, {left:-halfWidth, right:halfWidth, top:halfHeight, bottom:-halfHeight, near:.1, far:40});
+    camera.updateProjectionMatrix();
+    uniforms.pixelRatio.value = renderer.getPixelRatio();
+    uniforms.scale.value = Math.max(.65, Math.min(1.35, h / halfHeight / 175));
+  }).observe(sceneHost);
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const ornamentPositions = anchors.map(coords => new T.Vector3(...coords));
+  const center = new T.Vector3();
+  const vertical = new T.Vector3(0,1,0);
+  let last = 0;
+  renderer.setAnimationLoop(ms => {
+    const dt = Math.min(.05, (ms - last) / 1000);
+    last = ms;
+    uniforms.progress.value += (target - uniforms.progress.value) * (1 - Math.exp(-dt * (reduced.matches ? 10 : 3.5)));
+    if (!reduced.matches) {
+      uniforms.time.value += dt;
+      if (cursor.hidden && !gallery.open && palmX === null && !drag) treeAngle += dt * .15;
+    }
+    uniforms.spin.value = treeAngle % tau;
+    const zoom = camera.zoom + (zoomTarget - camera.zoom) * (1 - Math.exp(-dt * 9));
+    if (Math.abs(zoom-camera.zoom) > .0001) {
+      camera.zoom = zoom;
+      camera.updateProjectionMatrix();
+    }
+    const visible = target === 0 && uniforms.progress.value < .12;
+    const width = sceneHost.clientWidth, height = sceneHost.clientHeight;
+    ornaments.forEach((button, i) => {
+      center.copy(ornamentPositions[i]).applyAxisAngle(vertical, uniforms.spin.value);
+      const depth = center.z;
+      center.project(camera);
+      placeOrnament(button,(center.x+1)*.5*width,(1-center.y)*.5*height,depth,width,height,visible);
+    });
+    renderer.render(scene, camera);
+  });
+}
+
+const handsSources = ['https://cdn.jsdelivr.net/npm/', 'https://unpkg.com/', 'https://gcore.jsdelivr.net/npm/']
+  .map(host => host + '@mediapipe/hands@0.4.1675469240/');
+const handsScripts = new Map();
+function loadHands(source) {
+  if (handsScripts.has(source)) return handsScripts.get(source);
+  const loading = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    const failed = (reason = '脚本下载失败') => {
+      clearTimeout(timer);
+      script.remove();
+      reject(new Error(reason));
+    };
+    const timer = setTimeout(() => failed('脚本下载超时'), 7000);
+    script.src = source + 'hands.js';
+    script.onload = () => {
+      clearTimeout(timer);
+      if (window.Hands) resolve(window.Hands);
+      else failed('脚本执行后未提供手势接口');
+    };
+    script.onerror = () => failed();
+    document.head.append(script);
+  }).catch(error => {
+    handsScripts.delete(source);
+    throw error;
+  });
+  handsScripts.set(source, loading);
+  return loading;
+}
+
+async function initializeHands(run) {
+  const failures = [];
+  for (const [attempt, source] of handsSources.entries()) {
+    const portableWasm = location.protocol === "file:" && attempt < 2;
+    const host = new URL(source).hostname;
+    let phase = '脚本';
+    let asset = '';
+    let timer;
+    status.textContent = '摄像头已开启，正在连接 ' + host + '…';
+    try {
+      const Hands = await loadHands(source);
+      if (session !== run) return false;
+      phase = '模型初始化';
+      run.hands = new Hands({ locateFile: file => {
+        asset = portableWasm ? file.replace(/^hands_solution_simd_wasm_bin(?=\.)/, "hands_solution_wasm_bin") : file;
+        return source + asset;
+      } });
+      run.hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: .65, minTrackingConfidence: .65 });
+      await Promise.race([
+        run.hands.initialize(),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error('模型初始化超时')), portableWasm ? 25000 : 18000);
+        })
+      ]);
+      return session === run;
+    } catch (error) {
+      failures.push(host + (portableWasm ? ' / 普通 WASM' : '') + ' / ' + phase + (asset ? ' / ' + asset : '') + '：' + String(error?.message ?? error).slice(0, 180));
+      console.warn('Hand tracking setup', source, error);
+      void closeHands(run);
+      if (session !== run) return false;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw new Error(failures.join('\n'));
+}
+
+let session;
+function stopCamera(message, expected = session) {
+  if (!expected || session !== expected) return;
+  session = undefined;
+  cancelAnimationFrame(expected.frame);
+  expected.stream?.getTracks().forEach(track => track.stop());
+  video.srcObject = null;
+  video.hidden = true;
+  clearPointer();
+  zoomAnchor = null;
+  palmX = null;
+  pinchLatched = false;
+  cameraButton.textContent = '开启摄像头';
+  status.textContent = message;
+  if (!expected.busy) void closeHands(expected);
+}
+
+async function closeHands(run) {
+  const hands = run.hands;
+  run.hands = null;
+  try { await hands?.close(); } catch { /* Camera tracks have already stopped. */ }
+}
+
+cameraButton.onclick = async () => {
+  if (session) {
+    stopCamera('Camera off · Manual controls available');
+    return;
+  }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    status.textContent = '当前预览无法使用摄像头。你仍可用按钮、滑块和挂饰。';
+    return;
+  }
+  const run = { busy: true };
+  let stage = 'permission';
+  const prior = document.getElementById('hands-details');
+  if (prior) prior.remove();
+  session = run;
+  cameraButton.textContent = '关闭摄像头';
+  status.textContent = '正在等待摄像头授权…';
+  gestureFilter = debounce();
+  try {
+    run.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: {ideal:640}, height:{ideal:480} }, audio:false });
+    if (session !== run) {
+      run.stream.getTracks().forEach(track => track.stop());
+      return;
+    }
+    run.stream.getVideoTracks()[0].addEventListener('ended', () => stopCamera('摄像头已断开 · 可继续手动操作', run));
+    stage = 'video';
+    video.muted = true;
+    video.playsInline = true;
+    video.srcObject = run.stream;
+    video.hidden = false;
+    await video.play();
+    if (session !== run) return;
+    stage = 'model';
+    status.textContent = '摄像头已开启，正在加载手势识别…';
+    if (!(await initializeHands(run))) return;
+    run.hands.onResults(results => {
+      if (session !== run) return;
+      const points = results.multiHandWorldLandmarks?.[0] ?? results.multiHandLandmarks?.[0];
+      handleHand(results.multiHandLandmarks?.[0], points);
+      if (gallery.open) return;
+      if (palmX !== null) gestureFilter(null, performance.now());
+      const gesture = classify(points);
+      const now = performance.now();
+      if (now >= manualUntil && cursor.hidden && !zoomAnchor && palmX === null) {
+        const mode = gestureFilter(gesture, now);
+        if (mode) setMode(mode);
+      }
+      const message = palmX !== null ? '掌心转树 · 左右移动' : !points ? 'Camera on · Show one hand' : gesture === 'gather' ? 'Camera on · Closed fist' : gesture === 'scatter' ? 'Camera on · Open palm' : 'Camera on · Hold an open palm or closed fist';
+      if (status.textContent !== message) status.textContent = message;
+    });
+    let previousTime = -1;
+    const frame = async () => {
+      if (session !== run) return;
+      run.busy = true;
+      try {
+        if (video.readyState >= 2 && video.currentTime !== previousTime) {
+          previousTime = video.currentTime;
+          await run.hands.send({image: video});
+        }
+      } catch {
+        stopCamera('手势识别运行失败。可继续点击操作，或换电脑浏览器试手势。', run);
+      } finally {
+        run.busy = false;
+        if (session === run) run.frame = requestAnimationFrame(frame);
+        else await closeHands(run);
+      }
+    };
+    run.frame = requestAnimationFrame(frame);
+  } catch (error) {
+    console.warn('Camera start failed', stage, error);
+    const message = stage === 'model'
+      ? '摄像头已启动过，但手势组件初始化失败。可继续手动操作，或在 Safari 中打开 HTTPS 网页试手势。'
+      : stage === 'video'
+        ? '摄像头已授权，但当前页面无法播放预览。可换电脑浏览器试手势。'
+        : ({
+          NotAllowedError: '未获得摄像头权限。你仍可点击挂饰和按钮。',
+          NotFoundError: '没有找到摄像头。你仍可手动操作。',
+          NotReadableError: '摄像头无法启动，可能正被其他应用占用。'
+        }[error.name] ?? '摄像头无法启动。你仍可手动操作。');
+    stopCamera(message, run);
+    if (stage === 'model' && !session) {
+      const details = document.createElement('details');
+      details.id = 'hands-details';
+      const summary = document.createElement('summary');
+      summary.textContent = '查看手势加载详情';
+      const report = document.createElement('pre');
+      report.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;text-align:left;font-size:.8rem';
+      report.textContent = '页面类型：' + location.protocol + ' / ' + (insideWeChat ? '微信' : '浏览器') + '\n' + error.message;
+      details.append(summary,report);
+      status.after(details);
+    }
+  } finally {
+    run.busy = false;
+    if (session !== run) await closeHands(run);
+  }
+};
+addEventListener('pagehide', () => stopCamera('Camera off · Manual controls available'));
+
+function buildFallback() {
+  sceneHost.querySelector('canvas')?.remove();
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return false;
+  sceneHost.prepend(canvas);
+  const palette = ['#fec46a','#e3913c','#fff0b2','#ffcf78','#b67035'];
+  const particles = Array.from({length:2400}, (_, i) => {
+    const h = Math.random(), a = Math.random() * Math.PI * 2;
+    const r = (1-h) * (1.85 - .42 * (h*8%1)) * (.55 + .45*Math.random());
+    return [Math.cos(a)*r, 2.03-h*4.32, Math.sin(a)*r,
+      (Math.random()-.5)*10, (Math.random()-.5)*6, Math.random()*6.28, palette[i%5]];
+  });
+  let spread = 0, zoom = 1, last = 0;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  function draw(now) {
+    const dt = Math.min(.05,(now-last)/1000);
+    last = now;
+    spread += (target-spread)*(1-Math.exp(-dt*4));
+    zoom += (zoomTarget-zoom)*(1-Math.exp(-dt*9));
+    const w = sceneHost.clientWidth, h = sceneHost.clientHeight;
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    if (canvas.width !== Math.round(w*dpr) || canvas.height !== Math.round(h*dpr)) {
+      canvas.width = Math.round(w*dpr);
+      canvas.height = Math.round(h*dpr);
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,w,h);
+    const scale = Math.min(w/5,h/6.5)*zoom;
+    const cx = w/2, cy = h/2;
+    const t = reduce.matches ? 0 : now/1000;
+    if (!reduce.matches && cursor.hidden && !gallery.open && palmX === null && !drag) treeAngle += dt * .15;
+    const spin = treeAngle;
+    for (const [x,y,z,ex,ey,phase,color] of particles) {
+      const px = x*Math.cos(spin)+z*Math.sin(spin);
+      ctx.globalAlpha = .35+.6*Math.pow(.5+.5*Math.sin(t*2+phase),2);
+      ctx.fillStyle = color;
+      const size = .8+1.7*(phase/6.28);
+      ctx.fillRect(cx+(px+(ex-px)*spread)*scale,cy+(y+(ey-y)*spread)*scale,size,size);
+    }
+    ctx.globalAlpha = 1-spread;
+    ctx.fillStyle = '#ffe5a0';
+    ctx.font = Math.max(15,scale*.62)+'px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('✦',cx,cy-2.58*scale);
+    ornaments.forEach((button,i) => {
+      const [x,y,z] = anchors[i];
+      const depth = z*Math.cos(spin)-x*Math.sin(spin);
+      const px = cx+(x*Math.cos(spin)+z*Math.sin(spin))*scale;
+      placeOrnament(button,px,cy-y*scale,depth,w,h,!target && spread<.12);
+    });
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+  if (!session) status.textContent = '兼容模式 · 可点击挂饰看照片';
+  return true;
+}
+
+const importThree = () => Promise.race([
+  import('https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js'),
+  new Promise((_, reject) => setTimeout(() => reject(new Error('3D load timeout')), 4500))
+]);
+const insideWeChat = /MicroMessenger/i.test(navigator.userAgent);
+if (insideWeChat) {
+  buildFallback();
+} else {
+  buildScene().catch(error => {
+    console.warn(error);
+    if (!buildFallback()) status.textContent = '画面无法启动，请用系统浏览器打开。';
+  });
+}
+</script>
+</body>
+</html>
