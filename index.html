@@ -46,6 +46,8 @@ dialog .close-photo{position:absolute;top:1.3rem;right:1.3rem;font-size:1.4rem;b
 .ornament-0::before{content:'';position:absolute;top:-5px;left:8px;width:6px;height:5px;background:#ffe3a0;border-radius:2px}
 .ornament-3,.ornament-5{color:var(--gem)}
 .creator{margin:.45rem 0 0;color:#e5b378;font-size:.8rem;letter-spacing:.12em}
+main{grid-template-columns:minmax(0,1fr)}
+@media(max-width:520px){h1{font-size:clamp(1rem,5.8vw,2rem);letter-spacing:.055em}header{padding-inline:.5rem}#hint{font-size:.86rem;overflow-wrap:anywhere}}
 </style>
 </head>
 <body>
@@ -649,11 +651,33 @@ function buildFallback() {
   if (!ctx) return false;
   sceneHost.prepend(canvas);
   const palette = ['#fec46a','#e3913c','#fff0b2','#ffcf78','#b67035'];
-  const particles = Array.from({length:2400}, (_, i) => {
+  const particles = Array.from({length:5200}, (_, i) => {
     const h = Math.random(), a = Math.random() * Math.PI * 2;
     const r = (1-h) * (1.85 - .42 * (h*8%1)) * (.55 + .45*Math.random());
     return [Math.cos(a)*r, 2.03-h*4.32, Math.sin(a)*r,
       (Math.random()-.5)*10, (Math.random()-.5)*6, Math.random()*6.28, palette[i%5]];
+  });
+  const tau = 2 * Math.PI;
+  const add = (x,y,z,color) => particles.push([x,y,z,(Math.random()-.5)*10,(Math.random()-.5)*6,Math.random()*tau,color]);
+  const bulbs = ['#ff7195','#77ffe0','#85bfff','#ff9fe2','#fff3aa'];
+  for (let i = 0; i < 1200; i++) {
+    const h = i / 1200, a = h * tau * 7.2, r = 1.84 * (1-h) + .025;
+    add(Math.cos(a)*r, 2.01-h*4.27, Math.sin(a)*r, i%43 < 3 ? bulbs[Math.floor(i/43)%5] : '#ffe4a1');
+  }
+  for (let i = 0; i < 60; i++) {
+    const h = .04 + Math.random()*.78, a = Math.random()*tau, r = (1-h)*1.78;
+    for (let j = 0; j < 12; j++) {
+      const angle = Math.random()*tau, d = Math.sqrt(Math.random())*.065;
+      add(Math.cos(a)*r+Math.cos(angle)*d, 2.04-h*4.36+Math.sin(angle)*d, Math.sin(a)*r, bulbs[i%5]);
+    }
+  }
+  const star = Array.from({length:300}, () => {
+    const edge = Math.floor(Math.random()*10);
+    const a = edge*tau/10, b = (edge+1)*tau/10;
+    const r = edge%2 ? .14 : .36, next = edge%2 ? .36 : .14;
+    const mix = Math.random(), fill = Math.sqrt(Math.random());
+    return [(Math.sin(a)*r*(1-mix)+Math.sin(b)*next*mix)*fill,
+      (Math.cos(a)*r*(1-mix)+Math.cos(b)*next*mix)*fill, Math.random()*tau];
   });
   let spread = 0, zoom = 1, last = 0;
   const reduce = matchMedia('(prefers-reduced-motion: reduce)');
@@ -675,19 +699,22 @@ function buildFallback() {
     const t = reduce.matches ? 0 : now/1000;
     if (!reduce.matches && cursor.hidden && !gallery.open && palmX === null && !drag) treeAngle += dt * .15;
     const spin = treeAngle;
+    const cosine = Math.cos(spin), sine = Math.sin(spin);
+    ctx.globalCompositeOperation = 'lighter';
     for (const [x,y,z,ex,ey,phase,color] of particles) {
-      const px = x*Math.cos(spin)+z*Math.sin(spin);
+      const px = x*cosine+z*sine;
       ctx.globalAlpha = .35+.6*Math.pow(.5+.5*Math.sin(t*2+phase),2);
       ctx.fillStyle = color;
-      const size = .8+1.7*(phase/6.28);
+      const size = .48+1.22*(phase/6.28);
       ctx.fillRect(cx+(px+(ex-px)*spread)*scale,cy+(y+(ey-y)*spread)*scale,size,size);
     }
-    ctx.globalAlpha = 1-spread;
     ctx.fillStyle = '#ffe5a0';
-    ctx.font = Math.max(15,scale*.62)+'px serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('✦',cx,cy-2.58*scale);
+    for (const [x,y,phase] of star) {
+      ctx.globalAlpha = (1-spread)*(.3+.55*(.5+.5*Math.sin(t*3+phase)));
+      ctx.fillRect(cx+x*scale,cy-(2.49+y)*scale,1.25,1.25);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
     ornaments.forEach((button,i) => {
       const [x,y,z] = anchors[i];
       const depth = z*Math.cos(spin)-x*Math.sin(spin);
@@ -703,17 +730,13 @@ function buildFallback() {
 
 const importThree = () => Promise.race([
   import('https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js'),
-  new Promise((_, reject) => setTimeout(() => reject(new Error('3D load timeout')), 4500))
+  new Promise((_, reject) => setTimeout(() => reject(new Error('3D load timeout')), 8000))
 ]);
 const insideWeChat = /MicroMessenger/i.test(navigator.userAgent);
-if (insideWeChat) {
-  buildFallback();
-} else {
-  buildScene().catch(error => {
-    console.warn(error);
-    if (!buildFallback()) status.textContent = '画面无法启动，请用系统浏览器打开。';
-  });
-}
+buildScene().catch(error => {
+  console.warn(error);
+  if (!buildFallback()) status.textContent = '画面无法启动，请用系统浏览器打开。';
+});
 </script>
 </body>
 </html>
