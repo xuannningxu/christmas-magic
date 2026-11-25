@@ -103,7 +103,7 @@ dialog:has(.ornament-editor){max-height:88svh;overflow:auto}
 <p id="status" role="status">点击开启，允许摄像头权限后把一只手放进画面</p>
 <div class="gesture-basics"><span><b>🖐️</b> 张手散开</span><span><b>✊</b> 握拳聚拢</span></div>
 <details class="gesture-more"><summary>更多手势玩法</summary>
-<ul><li>收起拇指，左右移动掌心转树</li><li><strong>✌️ 手势缩放</strong>：朝镜头只伸出食指和中指，其余手指收起。保持手在画面内，两指慢慢分开可放大圣诞树，慢慢靠拢可缩小。</li><li>用食指瞄准挂饰，再捏合打开照片</li></ul>
+<ul><li>收起拇指，左右移动掌心转树</li><li><strong>✌️ 手势缩放</strong>：朝镜头只伸出食指和中指，其余手指收起。保持手在画面内，两指慢慢分开可放大圣诞树，慢慢靠拢可缩小。</li><li>用食指瞄准挂饰，再捏合打开照片</li><li>照片打开后做 👌 手势，保持片刻即可关闭</li></ul>
 </details>
 </section></header>
 <div id="scene" aria-hidden="true"><div class="winter-snow"><i style="--x:9%;--size:3px;--duration:11s;--delay:-0s;--drift:-12px"></i><i style="--x:46%;--size:2px;--duration:18s;--delay:-13s;--drift:13px"></i><i style="--x:83%;--size:2px;--duration:11s;--delay:-3s;--drift:-14px"></i><i style="--x:20%;--size:2px;--duration:18s;--delay:-16s;--drift:15px"></i><i style="--x:57%;--size:2px;--duration:11s;--delay:-6s;--drift:-16px"></i><i style="--x:94%;--size:2px;--duration:18s;--delay:-19s;--drift:17px"></i><i style="--x:31%;--size:2px;--duration:11s;--delay:-9s;--drift:-18px"></i><i style="--x:68%;--size:3px;--duration:18s;--delay:-22s;--drift:19px"></i><i style="--x:5%;--size:2px;--duration:11s;--delay:-12s;--drift:-20px"></i><i style="--x:42%;--size:2px;--duration:18s;--delay:-2s;--drift:21px"></i><i style="--x:79%;--size:2px;--duration:11s;--delay:-15s;--drift:-22px"></i><i style="--x:16%;--size:2px;--duration:18s;--delay:-5s;--drift:23px"></i><i style="--x:53%;--size:2px;--duration:11s;--delay:-18s;--drift:-24px"></i><i style="--x:90%;--size:2px;--duration:18s;--delay:-8s;--drift:25px"></i><i style="--x:27%;--size:3px;--duration:11s;--delay:-21s;--drift:-26px"></i><i style="--x:64%;--size:2px;--duration:18s;--delay:-11s;--drift:27px"></i><i style="--x:1%;--size:2px;--duration:11s;--delay:-1s;--drift:-28px"></i><i style="--x:38%;--size:2px;--duration:18s;--delay:-14s;--drift:29px"></i><i style="--x:75%;--size:2px;--duration:11s;--delay:-4s;--drift:-12px"></i><i style="--x:12%;--size:2px;--duration:18s;--delay:-17s;--drift:13px"></i><i style="--x:49%;--size:2px;--duration:11s;--delay:-7s;--drift:-14px"></i><i style="--x:86%;--size:3px;--duration:18s;--delay:-20s;--drift:15px"></i><i style="--x:23%;--size:2px;--duration:11s;--delay:-10s;--drift:-16px"></i><i style="--x:60%;--size:2px;--duration:18s;--delay:-0s;--drift:17px"></i></div></div>
@@ -367,10 +367,22 @@ shareButton.onclick = async () => {
   }
 };
 let selectedPhoto = 0;
+let photoCloseSince = null;
+let waitForOkRelease = false;
 const ornamentEditor = document.createElement('details');
 ornamentEditor.className = 'ornament-editor';
 ornamentEditor.innerHTML = '<summary>自定义挂饰</summary><label>样式 <select></select></label><label>颜色 <input type="color"></label><label>高度 <input type="range" min="-1.9" max="1.85" step=".01"></label><label>环绕位置 <input type="range" min="0" max="360" step="1"></label><button type="button">保存挂饰</button><small role="status"></small>';
 gallery.append(ornamentEditor);
+const closeGestureHint = document.createElement('small');
+closeGestureHint.textContent = '开启摄像头后，做 👌 手势可关闭照片';
+gallery.append(closeGestureHint);
+function isOkGesture(points) {
+  if (!points || points.length < 21) return false;
+  const distance = (a,b) => Math.hypot(points[a].x-points[b].x, points[a].y-points[b].y, points[a].z-points[b].z);
+  const palm = distance(0,9);
+  return palm > 0 && distance(4,8) < palm*.37 &&
+    [9,13,17].every(base => distance(0,base+3) > distance(0,base+1)*1.13);
+}
 const [kindField,colorField,heightField,angleField] = ornamentEditor.querySelectorAll('select,input');
 let ornamentSettings = {};
 try { ornamentSettings = JSON.parse(localStorage.getItem('tree-ornaments') || '{}') || {}; } catch {}
@@ -399,6 +411,7 @@ ornamentEditor.querySelector('button').onclick = () => {
 function openPhoto(index) {
   if (gallery.open || target) return;
   selectedPhoto = index;
+  photoCloseSince = null;
   refreshEditor(index);
   if (navigator.vibrate) navigator.vibrate(28);
   recordInteraction('ornament_open');
@@ -879,6 +892,27 @@ cameraButton.onclick = async () => {
       if (session !== run) return;
       const points = results.multiHandWorldLandmarks?.[0] ?? results.multiHandLandmarks?.[0];
       if (!trackingReady) { trackingReady = true; recordInteraction('gesture_ready'); }
+      const ok = isOkGesture(points);
+      const frameTime = performance.now();
+      if (gallery.open) {
+        if (!ok) photoCloseSince = null;
+        else {
+          photoCloseSince ??= frameTime;
+          if (frameTime - photoCloseSince >= 340) {
+            waitForOkRelease = true;
+            if (typeof gallery.close === 'function') gallery.close();
+            else {
+              gallery.removeAttribute('open');
+              gallery.onclose();
+            }
+          }
+        }
+        return;
+      }
+      if (waitForOkRelease) {
+        if (!ok && points) waitForOkRelease = false;
+        return;
+      }
       handleHand(results.multiHandLandmarks?.[0], points);
       if (gallery.open) return;
       if (palmX !== null) gestureFilter(null, performance.now());
