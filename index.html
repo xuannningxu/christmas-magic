@@ -184,23 +184,100 @@ if (/^G-[A-Z0-9]+$/.test(analyticsId) && location.protocol === 'https:') {
 let interacted = false;
 const publicCountEndpoint = 'https://christmas-counter.avancez07.workers.dev/';
 const publicCountLabel = document.getElementById('public-tree-count');
-const publicVisitId = location.origin === 'https://xuannningxu.github.io' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : '';
 let countedInteraction = false;
 let publicCountQueue = Promise.resolve();
+let latestCounts = null;
+
+function getCounterStorage(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function setCounterStorage(key, value) {
+  try { localStorage.setItem(key, value); } catch {}
+}
+function getPublicVisitId() {
+  if (location.origin !== 'https://xuannningxu.github.io' || !globalThis.crypto?.getRandomValues) return '';
+  const key = 'christmas-counter-visitor-v1';
+  const saved = getCounterStorage(key);
+  if (saved && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(saved)) return saved;
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 15) | 64;
+  bytes[8] = (bytes[8] & 63) | 128;
+  const hex = Array.from(bytes, byte => byte.toString(16).padStart(2,'0')).join('');
+  const id = [hex.slice(0,8),hex.slice(8,12),hex.slice(12,16),hex.slice(16,20),hex.slice(20)].join('-');
+  setCounterStorage(key, id);
+  return id;
+}
+const publicVisitId = getPublicVisitId();
+const countCacheKey = 'christmas-counter-last-success-v1';
+function validCounts(data) {
+  return data && Number.isSafeInteger(data.views) && Number.isSafeInteger(data.interactions) &&
+    data.views >= 0 && data.interactions >= 0 && data.interactions <= data.views;
+}
+function showPublicCounts(data, cached) {
+  const labels = {
+    'zh-CN':['访客','互动','缓存'],
+    'zh-TW':['訪客','互動','快取'],
+    en:['Visitors','Interactions','cached'],
+    es:['Visitantes','Interacciones','en caché'],
+    fr:['Visiteurs','Interactions','en cache']
+  };
+  const lang = document.documentElement.lang;
+  const [visitors, interactions, saved] = labels[lang] || labels.en;
+  publicCountLabel.textContent = visitors + ' ' + data.views.toLocaleString(lang) +
+    ' · ' + interactions + ' ' + data.interactions.toLocaleString(lang) + (cached ? ' · ' + saved : '');
+  publicCountLabel.dataset.cached = String(cached);
+}
+if (publicVisitId) {
+  try {
+    const cached = JSON.parse(getCounterStorage(countCacheKey));
+    if (validCounts(cached)) {
+      latestCounts = cached;
+      showPublicCounts(cached, true);
+    }
+  } catch {}
+  document.getElementById('site-language')?.addEventListener('change', () => {
+    if (latestCounts) showPublicCounts(latestCounts, publicCountLabel.dataset.cached === 'true');
+  });
+}
+async function requestPublicCount(event) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await new Promise(resolve => setTimeout(resolve, attempt * 450));
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    try {
+      const response = await fetch(publicCountEndpoint, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({event, visit:publicVisitId}),
+        signal:controller.signal,
+        cache:'no-store'
+      });
+      if (!response.ok) {
+        const error = new Error('Counter HTTP ' + response.status);
+        error.permanent = response.status >= 400 && response.status < 500 && response.status !== 429;
+        throw error;
+      }
+      const counts = await response.json();
+      if (!validCounts(counts)) throw new Error('Invalid counter response');
+      return counts;
+    } catch (error) {
+      if (error.permanent || attempt === 2) throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+}
 function submitPublicCount(event) {
   if (!publicVisitId) return;
   publicCountQueue = publicCountQueue.then(async () => {
-    const result = await fetch(publicCountEndpoint, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({event, visit:publicVisitId}),
-      cache:'no-store'
-    });
-    if (!result.ok) throw new Error('Counter unavailable');
-    const {views, interactions} = await result.json();
-    if (![views, interactions].every(n => Number.isSafeInteger(n) && n >= 0)) throw new Error('Invalid counter');
-    publicCountLabel.textContent = '累计浏览 ' + views.toLocaleString('zh-CN') + ' · 累计互动 ' + interactions.toLocaleString('zh-CN');
-  }).catch(() => { publicCountLabel.textContent = '浏览和互动统计暂不可用'; });
+    latestCounts = await requestPublicCount(event);
+    setCounterStorage(countCacheKey, JSON.stringify(latestCounts));
+    showPublicCounts(latestCounts, false);
+  }).catch(error => {
+    console.warn('Christmas counter request failed', error.message);
+    if (latestCounts) showPublicCounts(latestCounts, true);
+    else publicCountLabel.textContent = '浏览和互动统计暂不可用';
+  });
 }
 submitPublicCount('view');
 function recordInteraction(name) {
