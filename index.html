@@ -112,7 +112,7 @@ main{grid-template-columns:minmax(0,1fr)}
 <button id="share-online">分享我的圣诞树链接</button>
 <p id="photo-save-status" role="status" hidden></p>
 
-<p id="public-tree-count" role="status">累计浏览 · 累计互动｜统计尚未接通</p>
+<p id="public-tree-count" role="status">正在加载浏览和互动统计…</p>
 <p class="rights-notice">原创设计 · Xxnefeli<br>严禁抄袭、冒用署名，或未经授权复制、改编、转载本站原创设计与交互实现。欢迎通过本站分享功能转发作品。</p>
 </footer>
 
@@ -138,9 +138,9 @@ if (/^G-[A-Z0-9]+$/.test(analyticsId) && location.protocol === 'https:') {
   document.head.append(analyticsScript);
 }
 let interacted = false;
-const publicCountEndpoint = '';
+const publicCountEndpoint = 'https://christmas-counter.avancez07.workers.dev/';
 const publicCountLabel = document.getElementById('public-tree-count');
-const publicVisitId = publicCountEndpoint && location.protocol === 'https:' ? crypto.randomUUID() : '';
+const publicVisitId = location.origin === 'https://xuannningxu.github.io' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : '';
 let countedInteraction = false;
 let publicCountQueue = Promise.resolve();
 function submitPublicCount(event) {
