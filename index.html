@@ -120,6 +120,12 @@ main>header{padding-top:max(2.85rem,env(safe-area-inset-top))}
   }
   [data-tree-theme]:not([data-tree-theme=gold]) h1{text-shadow:0 0 35px var(--desktop-glow)}
 }
+/* Pair the tree with a contrasting hue instead of matching its background. */
+[data-tree-theme=mint] #scene canvas{filter:hue-rotate(326deg) saturate(1.16) brightness(1.08)}
+[data-tree-theme=ice] #scene canvas{filter:hue-rotate(12deg) saturate(.8) brightness(1.12)}
+[data-tree-theme=rose] #scene canvas{filter:hue-rotate(142deg) saturate(1.15) brightness(1.12)}
+[data-tree-theme=cedar] #scene canvas{filter:hue-rotate(92deg) saturate(1.1) brightness(1.12)}
+[data-tree-theme=violet] #scene canvas{filter:hue-rotate(350deg) saturate(1.32) brightness(1.08)}
 </style>
 </head>
 <body>
