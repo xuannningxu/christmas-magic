@@ -91,10 +91,20 @@ dialog:has(.ornament-editor)[open] img{animation:photoReveal .33s ease-out both}
 .ornament-editor label{display:flex;justify-content:space-between;align-items:center;gap:1rem;max-width:20rem;margin:.45rem auto}
 .ornament-editor small{display:block;margin-top:.35rem}
 dialog:has(.ornament-editor){max-height:88svh;overflow:auto}
+
+.scene-preferences{position:absolute;z-index:4;top:.55rem;right:.65rem;display:flex;gap:.45rem;font-size:.72rem;color:#e0c5a0}
+.scene-preferences label{display:flex;align-items:center;gap:.25rem}
+.scene-preferences select{font:inherit;color:#ffe4bc;background:#18110d;border:1px solid #72573d;border-radius:6px;padding:.24rem}
+main>header{padding-top:max(2.85rem,env(safe-area-inset-top))}
+[data-tree-theme=mint] #scene canvas{filter:hue-rotate(68deg)}
+[data-tree-theme=ice] #scene canvas{filter:hue-rotate(164deg)}
+[data-tree-theme=rose] #scene canvas{filter:hue-rotate(298deg)}
 </style>
 </head>
 <body>
 <main>
+<div class="scene-preferences"><label>Language <select id="site-language" aria-label="Language"><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文</option><option value="en">English</option></select></label>
+<label><span>主题色</span> <select id="tree-theme"><option value="gold">金色</option><option value="mint">淡绿色</option><option value="ice">冰蓝色</option><option value="rose">玫瑰粉</option></select></label></div>
 <noscript><p>当前文件预览无法运行交互。请保存 HTML 后，用电脑上的 Edge 或 Chrome 打开。</p></noscript>
 <header><span class="eyebrow">冬日手势互动</span><h1>Merry Christmas</h1><p class="creator">创意 · Whathappenedx</p><section class="gesture-start" aria-label="摄像头手势玩法">
 <p class="gesture-intro">用手势操控圣诞树</p>
@@ -1069,6 +1079,79 @@ buildScene().catch(error => {
   console.warn(error);
   if (!buildFallback()) status.textContent = '画面无法启动，请用系统浏览器打开。';
 });
+
+const english = new Map([["冬日手势互动","Winter gesture experience"],["创意","Creative direction"],["原创设计","Original design"],["用手势操控圣诞树","Control the tree with your hand"],["开启摄像头","Enable camera"],["关闭摄像头","Turn off camera"],["点击开启，允许摄像头权限后把一只手放进画面","Enable the camera, allow access, and show one hand."],["张手散开","Open palm to scatter"],["握拳聚拢","Make a fist to gather"],["更多手势玩法","More gestures"],["收起拇指，左右移动掌心转树","Tuck your thumb and move your palm sideways to rotate"],["手势缩放","Gesture zoom"],["：朝镜头只伸出食指和中指，其余手指收起。保持手在画面内，两指慢慢分开可放大圣诞树，慢慢靠拢可缩小。",": Hold up only your index and middle fingers. Move them apart to zoom in and together to zoom out."],["用食指瞄准挂饰，再捏合打开照片","Point at an ornament and pinch to open its photo"],["照片打开后做 👌 手势，保持片刻即可关闭","Hold an 👌 gesture briefly to close the photo"],["拖动转树 · 点击挂饰看照片","Drag to rotate · Tap ornaments to view photos"],["聚拢","Gather"],["散开","Scatter"],["支持 Xxnefeli","Support Xxnefeli"],["分享我的圣诞树","Share my Christmas tree"],["发送已导出的文件","Send exported file"],["正在加载浏览和互动统计…","Loading views and interactions…"],["累计浏览","Views"],["累计互动","Interactions"],["浏览和互动统计暂不可用","Counts are temporarily unavailable"],["严禁抄袭、冒用署名，或未经授权复制、改编、转载本站原创设计与交互实现。欢迎通过本站分享功能转发作品。","Do not plagiarize, misattribute, copy, adapt, or republish the original design or interaction code without permission. You may share your tree using the site's share feature."],["微信赞赏","WeChat appreciation"],["用微信扫一扫，或保存图片后从相册识别。","Scan with WeChat, or save the image and scan it from your gallery."],["更换这张照片","Replace this photo"],["自定义挂饰","Customize ornament"],["样式","Style"],["颜色","Color"],["高度","Height"],["环绕位置","Position around tree"],["保存挂饰","Save ornament"],["开启摄像头后，做 👌 手势可关闭照片","With the camera on, use 👌 to close the photo"],["已保存到本机","Saved on this device"],["已应用，浏览器未能保存","Applied. Your browser could not save it."],["挂饰照片","Ornament photo"],["打开照片","Open photo"],["照片已保存到当前浏览器。","Photo saved in this browser."],["本机保存失败，仍可尝试导出分享文件。","Local save failed. You can still try exporting."],["当前浏览器无法读取本机照片。","This browser could not load saved photos."],["系统分享失败，可再点导出并保存文件。","Sharing failed. Try exporting the file again."],["先打开一个挂饰并更换照片，再导出分享文件。","Replace an ornament photo before sharing."],["已生成带照片的网页。可发送下载的文件，或点「发送已导出的文件」。","Your page is ready. Send the downloaded file or tap Send exported file."],["导出失败。请在浏览器打开 GitHub Pages 在线版后再试。","Export failed. Open the live site in your browser and try again."],["缩放","Zoom"],["彩球","Bauble"],["铃铛","Bell"],["礼盒","Gift"],["雪花","Snowflake"],["糖果","Candy"],["星星","Star"],["正在等待摄像头授权…","Waiting for camera permission…"],["摄像头已开启，正在加载手势识别…","Camera on. Loading hand tracking…"],["摄像头已开启，正在连接","Camera on. Connecting to"],["手势已开启 · 请把一只手放进画面","Hand tracking ready · Show one hand"],["掌心转树 · 左右移动","Rotate · Move your palm sideways"],["摄像头已关闭 · 可点击按钮或拖动转树","Camera off · Use the buttons or drag to rotate"],["摄像头已断开 · 可继续手动操作","Camera disconnected · Manual controls are available"],["未获得摄像头权限。你仍可点击挂饰和按钮。","Camera permission denied. You can still tap ornaments and buttons."],["没有找到摄像头。你仍可手动操作。","No camera found. Manual controls are available."],["摄像头无法启动，可能正被其他应用占用。","Camera could not start. Another app may be using it."],["当前预览无法使用摄像头。你仍可用按钮、滑块和挂饰。","Camera unavailable in this preview. You can still use the manual controls."],["兼容模式 · 可点击挂饰看照片","Compatibility mode · Tap ornaments to view photos"],["查看手势加载详情","View hand-tracking details"],["画面无法启动，请用系统浏览器打开。","The scene could not start. Open the page in your browser."],["摄像头已启动过，但手势组件初始化失败。可继续手动操作，或在 Safari 中打开 HTTPS 网页试手势。","Hand tracking could not start. Use manual controls or try the HTTPS page in Safari."],["摄像头已授权，但当前页面无法播放预览。可换电脑浏览器试手势。","Camera access was granted, but preview could not start. Try a desktop browser."],["手势识别运行失败。可继续点击操作，或换电脑浏览器试手势。","Hand tracking stopped. Use manual controls or try a desktop browser."],["摄像头无法启动。你仍可手动操作。","Camera could not start. Manual controls are available."],["金色","Gold"],["淡绿色","Mint"],["冰蓝色","Ice blue"],["玫瑰粉","Rose"],["主题色","Tree theme"],["摄像头手势玩法","Camera gestures"],["摄像头镜像预览","Mirrored camera preview"],["关闭照片","Close photo"],["关闭赞赏","Close appreciation"],["缩放圣诞树","Zoom the Christmas tree"],["Camera on · Closed fist","Camera on · Closed fist"],["Camera on · Open palm","Camera on · Open palm"],["Camera on · Hold an open palm or closed fist","Camera on · Show an open palm or fist"]]);
+const traditionalChars = new Map([["势","勢"],["动","動"],["创","創"],["摄","攝"],["头","頭"],["开","開"],["启","啟"],["关","關"],["闭","閉"],["击","擊"],["许","許"],["权","權"],["后","後"],["进","進"],["画","畫"],["张","張"],["拢","攏"],["缩","縮"],["镜","鏡"],["两","兩"],["树","樹"],["触","觸"],["转","轉"],["饰","飾"],["环","環"],["绕","繞"],["发","發"],["导","導"],["览","覽"],["统","統"],["暂","暫"],["严","嚴"],["袭","襲"],["经","經"],["复","複"],["制","製"],["编","編"],["载","載"],["欢","歡"],["过","過"],["赞","讚"],["扫","掃"],["图","圖"],["从","從"],["识","識"],["换","換"],["这","這"],["样","樣"],["颜","顏"],["应","應"],["浏","瀏"],["读","讀"],["败","敗"],["试","試"],["网","網"],["页","頁"],["线","線"],["绿","綠"],["蓝","藍"],["礼","禮"],["铃","鈴"],["铛","鐺"],["断","斷"],["续","續"],["获","獲"],["组","組"],["运","運"],["当","當"],["电","電"],["脑","腦"],["无","無"],["显","顯"],["详","詳"],["连","連"],["语","語"],["体","體"],["个","個"],["选","選"],["实","實"],["点","點"],["内","內"],["为","為"],["设","設"],["计","計"],["与","與"],["现","現"],["码","碼"],["称","稱"],["传","傳"],["输","輸"],["远","遠"]]);
+const langMenu = document.getElementById('site-language');
+const themeMenu = document.getElementById('tree-theme');
+function readPreference(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function savePreference(key,value) {
+  try { localStorage.setItem(key,value); } catch {}
+}
+const browserLanguage = navigator.language || 'zh-CN';
+langMenu.value = readPreference('tree-language') ||
+  (/^zh-(TW|HK|MO|Hant)/i.test(browserLanguage) ? 'zh-TW' : /^zh/i.test(browserLanguage) ? 'zh-CN' : 'en');
+if (!langMenu.value) langMenu.value = 'zh-CN';
+themeMenu.value = readPreference('tree-theme') || 'gold';
+if (!themeMenu.value) themeMenu.value = 'gold';
+function applyTheme() { document.documentElement.dataset.treeTheme = themeMenu.value; }
+applyTheme();
+themeMenu.onchange = () => { applyTheme(); savePreference('tree-theme',themeMenu.value); };
+
+const originals = new WeakMap();
+function translate(value) {
+  const lang = langMenu.value;
+  if (lang === 'zh-CN') return value;
+  if (lang === 'zh-TW') return [...value].map(char=>traditionalChars.get(char)||char).join('');
+  const trimmed = value.trim();
+  if (!trimmed) return value;
+  let result = english.get(trimmed);
+  if (!result) {
+    result = trimmed;
+    for (const key of ['创意','原创设计','累计浏览','累计互动','挂饰照片','打开照片','摄像头已开启，正在连接']) {
+      if (result.includes(key)) result = result.replace(key,english.get(key));
+    }
+  }
+  return value.replace(trimmed,()=>result);
+}
+function localizeNode(node) {
+  const host = node.nodeType === 3 ? node.parentElement : node;
+  if (!host || host.closest('script,style,#site-language')) return;
+  if (node.nodeType === 3) {
+    const old = originals.get(node);
+    const source = old?.rendered === node.data ? old.source : node.data;
+    const rendered = translate(source);
+    originals.set(node,{source,rendered});
+    if (rendered !== node.data) node.data = rendered;
+    return;
+  }
+  if (node.nodeType !== 1) return;
+  for (const attr of ['aria-label','alt']) {
+    if (!node.hasAttribute(attr)) continue;
+    const state = originals.get(node) || {};
+    const current = node.getAttribute(attr);
+    const source = state[attr]?.rendered === current ? state[attr].source : current;
+    const rendered = translate(source);
+    state[attr] = {source,rendered};
+    originals.set(node,state);
+    if (current !== rendered) node.setAttribute(attr,rendered);
+  }
+  node.childNodes.forEach(localizeNode);
+}
+function applyLanguage() {
+  document.documentElement.lang = langMenu.value;
+  localizeNode(document.body);
+}
+langMenu.onchange = () => { savePreference('tree-language',langMenu.value); applyLanguage(); };
+applyLanguage();
+new MutationObserver(records => {
+  for (const record of records) {
+    if (record.type === 'childList') record.addedNodes.forEach(localizeNode);
+    else localizeNode(record.target);
+  }
+}).observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['aria-label','alt']});
 </script>
 </body>
 </html>
