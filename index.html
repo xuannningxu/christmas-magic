@@ -82,6 +82,15 @@ main{grid-template-columns:minmax(0,1fr)}
 .camera-entry #preview{position:static;inset:auto;display:block;width:clamp(68px,19vw,96px);height:auto;aspect-ratio:4/3;object-fit:cover;border:1px solid #c59b65a0;border-radius:12px;box-shadow:0 4px 18px #0009;transform:scaleX(-1)}
 .camera-entry #preview[hidden]{display:none}
 #public-tree-count{margin:.75rem auto 0;color:#dfbe91;font-size:.8rem}
+
+dialog:has(.ornament-editor)[open] img{animation:photoReveal .33s ease-out both}
+@keyframes photoReveal{from{opacity:.3;transform:translateY(5px) scale(.98)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){dialog:has(.ornament-editor)[open] img{animation:none}}
+.ornament-editor{margin:.7rem auto 0;font-size:.86rem}
+.ornament-editor summary{cursor:pointer;color:#eac589}
+.ornament-editor label{display:flex;justify-content:space-between;align-items:center;gap:1rem;max-width:20rem;margin:.45rem auto}
+.ornament-editor small{display:block;margin-top:.35rem}
+dialog:has(.ornament-editor){max-height:88svh;overflow:auto}
 </style>
 </head>
 <body>
@@ -413,9 +422,40 @@ shareButton.onclick = async () => {
   }
 };
 let selectedPhoto = 0;
+const ornamentEditor = document.createElement('details');
+ornamentEditor.className = 'ornament-editor';
+ornamentEditor.innerHTML = '<summary>自定义挂饰</summary><label>样式 <select></select></label><label>颜色 <input type="color"></label><label>高度 <input type="range" min="-1.9" max="1.85" step=".01"></label><label>环绕位置 <input type="range" min="0" max="360" step="1"></label><button type="button">保存挂饰</button><small role="status"></small>';
+gallery.append(ornamentEditor);
+const [kindField,colorField,heightField,angleField] = ornamentEditor.querySelectorAll('select,input');
+let ornamentSettings = {};
+try { ornamentSettings = JSON.parse(localStorage.getItem('tree-ornaments') || '{}') || {}; } catch {}
+function refreshEditor(index) {
+  const item = ornamentConfig(index);
+  kindField.value = item.kind;
+  colorField.value = item.color;
+  heightField.value = item.height;
+  angleField.value = item.angle;
+  ornamentEditor.open = false;
+  ornamentEditor.querySelector('small').textContent = '';
+}
+ornamentEditor.querySelector('button').onclick = () => {
+  const index = selectedPhoto;
+  ornamentSettings[index] = {kind:Number(kindField.value),color:colorField.value,height:Number(heightField.value),angle:Number(angleField.value)};
+  anchors[index] = ornamentAnchor(index);
+  paintOrnament(ornaments[index],index);
+  const message = ornamentEditor.querySelector('small');
+  try {
+    localStorage.setItem('tree-ornaments',JSON.stringify(ornamentSettings));
+    message.textContent = '已保存到本机';
+  } catch {
+    message.textContent = '已应用，浏览器未能保存';
+  }
+};
 function openPhoto(index) {
   if (gallery.open || target) return;
   selectedPhoto = index;
+  refreshEditor(index);
+  if (navigator.vibrate) navigator.vibrate(28);
   recordInteraction('ornament_open');
   photo.src = photos[index];
   photo.alt = '挂饰照片 ' + (index + 1);
@@ -494,12 +534,28 @@ sceneHost.addEventListener('pointermove', event => {
   if (!drag.counted) { drag.counted = true; recordInteraction('tree_drag'); }
 });
 sceneHost.addEventListener('lostpointercapture', () => { drag = null; });
-const anchors = photos.map((_, i) => {
-  const y = 1.79 - i * .238;
-  const angle = i * 2.39996;
-  const radius = (2.32-y) * .41;
-  return [Math.sin(angle)*radius,y,Math.cos(angle)*radius];
-});
+const ornamentColors = ['#ff6b8b','#70ffcf','#80bdff','#ff9cec','#ffda81'];
+const ornamentIcons = ['', '🔔', '🎁', '❄', '🍬', '★'];
+decorations.forEach((name,index) => kindField.add(new Option(name,index)));
+function ornamentConfig(index) {
+  const value = ornamentSettings[index];
+  if (value && Number.isInteger(value.kind) && value.kind >= 0 && value.kind < decorations.length &&
+      /^#[0-9a-f]{6}$/i.test(value.color) && Number.isFinite(value.height) && Number.isFinite(value.angle)) return value;
+  return {kind:index%decorations.length,color:ornamentColors[index%5],height:1.79-index*.238,angle:(index*2.39996*180/Math.PI)%360};
+}
+function ornamentAnchor(index) {
+  const {height,angle} = ornamentConfig(index);
+  const r = (2.32-height)*.41, radians = angle*Math.PI/180;
+  return [Math.sin(radians)*r,height,Math.cos(radians)*r];
+}
+function paintOrnament(button,index) {
+  const {kind,color} = ornamentConfig(index);
+  button.className = 'photo-ornament ornament-' + kind;
+  button.setAttribute('aria-label', decorations[kind] + ' · 打开照片 ' + (index+1));
+  button.style.setProperty('--gem',color);
+  button.textContent = ornamentIcons[kind];
+}
+const anchors = photos.map((_,index) => ornamentAnchor(index));
 function placeOrnament(button, x, y, depth, width, height, visible) {
   button.hidden = !visible || depth < -.1 || x < 18 || x > width-18 || y < 18 || y > height-18;
   button.style.left = x+'px';
@@ -507,11 +563,8 @@ function placeOrnament(button, x, y, depth, width, height, visible) {
 }
 const ornaments = photos.map((_, index) => {
   const button = document.createElement('button');
-  button.className = 'photo-ornament ornament-' + index % decorations.length;
   button.type = 'button';
-  button.setAttribute('aria-label', decorations[index % decorations.length] + ' · 打开照片 ' + (index + 1));
-  button.style.setProperty('--gem', ['#ff6b8b','#70ffcf','#80bdff','#ff9cec','#ffda81'][index % 5]);
-  button.textContent = ['', '🔔', '🎁', '❄', '🍬', '★'][index % decorations.length];
+  paintOrnament(button,index);
   button.hidden = true;
   button.onclick = () => openPhoto(index);
   sceneHost.append(button);
@@ -724,7 +777,6 @@ async function buildScene() {
     uniforms.scale.value = Math.max(.65, Math.min(1.35, h / halfHeight / 175));
   }).observe(sceneHost);
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  const ornamentPositions = anchors.map(coords => new T.Vector3(...coords));
   const center = new T.Vector3();
   const vertical = new T.Vector3(0,1,0);
   let last = 0;
@@ -745,7 +797,7 @@ async function buildScene() {
     const visible = target === 0 && uniforms.progress.value < .12;
     const width = sceneHost.clientWidth, height = sceneHost.clientHeight;
     ornaments.forEach((button, i) => {
-      center.copy(ornamentPositions[i]).applyAxisAngle(vertical, uniforms.spin.value);
+      center.fromArray(anchors[i]).applyAxisAngle(vertical, uniforms.spin.value);
       const depth = center.z;
       center.project(camera);
       placeOrnament(button,(center.x+1)*.5*width,(1-center.y)*.5*height,depth,width,height,visible);
