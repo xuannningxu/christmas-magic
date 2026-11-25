@@ -182,7 +182,11 @@ if (/^G-[A-Z0-9]+$/.test(analyticsId) && location.protocol === 'https:') {
   document.head.append(analyticsScript);
 }
 let interacted = false;
-const publicCountEndpoint = 'https://christmas-counter.avancez07.workers.dev/';
+const publicCountEndpoints = [
+  'https://christmas-counter.avancez07.workers.dev/',
+  'https://christmas-counter-backup.pages.dev/'
+];
+let preferredCounter = 0;
 const publicCountLabel = document.getElementById('public-tree-count');
 let countedInteraction = false;
 let publicCountQueue = Promise.resolve();
@@ -240,12 +244,14 @@ if (publicVisitId) {
   });
 }
 async function requestPublicCount(event) {
+  const first = preferredCounter;
   for (let attempt = 0; attempt < 3; attempt++) {
+    const index = (first + attempt) % publicCountEndpoints.length;
     if (attempt) await new Promise(resolve => setTimeout(resolve, attempt * 450));
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3000);
     try {
-      const response = await fetch(publicCountEndpoint, {
+      const response = await fetch(publicCountEndpoints[index], {
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({event, visit:publicVisitId}),
@@ -254,14 +260,14 @@ async function requestPublicCount(event) {
       });
       if (!response.ok) {
         const error = new Error('Counter HTTP ' + response.status);
-        error.permanent = response.status >= 400 && response.status < 500 && response.status !== 429;
         throw error;
       }
       const counts = await response.json();
       if (!validCounts(counts)) throw new Error('Invalid counter response');
+      preferredCounter = index;
       return counts;
     } catch (error) {
-      if (error.permanent || attempt === 2) throw error;
+      if (attempt === 2) throw error;
     } finally {
       clearTimeout(timeout);
     }
