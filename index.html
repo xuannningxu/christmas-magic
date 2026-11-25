@@ -96,6 +96,17 @@ dialog:has(.ornament-editor){max-height:88svh;overflow:auto}
 .scene-preferences label{display:flex;align-items:center;gap:.25rem}
 .scene-preferences select{font:inherit;color:#ffe4bc;background:#18110d;border:1px solid #72573d;border-radius:6px;padding:.24rem}
 main>header{padding-top:max(2.85rem,env(safe-area-inset-top))}
+[data-tree-theme=mint]{--theme-glow:#183e31;--theme-middle:#0d201b;--theme-edge:#070e0c;--theme-light:#dbffea;--theme-accent:#8bd2af;--theme-border:#537f69}
+[data-tree-theme=ice]{--theme-glow:#203653;--theme-middle:#101d33;--theme-edge:#080d18;--theme-light:#e1f2ff;--theme-accent:#94bff4;--theme-border:#516d96}
+[data-tree-theme=rose]{--theme-glow:#48263c;--theme-middle:#281624;--theme-edge:#110a11;--theme-light:#ffe4f0;--theme-accent:#e6a0c7;--theme-border:#936481}
+[data-tree-theme]:not([data-tree-theme=gold]){background:var(--theme-edge);color:var(--theme-light)}
+[data-tree-theme]:not([data-tree-theme=gold]) main{background:radial-gradient(ellipse at 50% 49%,var(--theme-glow),var(--theme-middle) 48%,var(--theme-edge) 82%)}
+[data-tree-theme]:not([data-tree-theme=gold]) :is(h1,.gesture-intro,#hint,.gesture-basics){color:var(--theme-light)}
+[data-tree-theme]:not([data-tree-theme=gold]) :is(.eyebrow,.creator,#status,.gesture-more,.zoom-control,.rights-notice,#public-tree-count,.scene-preferences){color:var(--theme-accent)}
+[data-tree-theme]:not([data-tree-theme=gold]) :is(button:not(.photo-ornament),.scene-preferences select,dialog){background:var(--theme-middle);border-color:var(--theme-border);color:var(--theme-light)}
+[data-tree-theme]:not([data-tree-theme=gold]) :is(#camera,#tip-button,button[aria-pressed=true]){background:linear-gradient(135deg,var(--theme-light),var(--theme-accent));border-color:var(--theme-accent);color:var(--theme-edge);box-shadow:0 0 16px var(--theme-border)}
+[data-tree-theme]:not([data-tree-theme=gold]) .zoom-control input{accent-color:var(--theme-accent)}
+[data-tree-theme]:not([data-tree-theme=gold]) .winter-snow i{color:var(--theme-light)}
 [data-tree-theme=mint] #scene canvas{filter:hue-rotate(68deg)}
 [data-tree-theme=ice] #scene canvas{filter:hue-rotate(164deg)}
 [data-tree-theme=rose] #scene canvas{filter:hue-rotate(298deg)}
