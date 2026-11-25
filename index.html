@@ -81,6 +81,7 @@ main{grid-template-columns:minmax(0,1fr)}
 .camera-entry{display:flex;align-items:center;justify-content:center;gap:.65rem;flex-wrap:wrap}
 .camera-entry #preview{position:static;inset:auto;display:block;width:clamp(68px,19vw,96px);height:auto;aspect-ratio:4/3;object-fit:cover;border:1px solid #c59b65a0;border-radius:12px;box-shadow:0 4px 18px #0009;transform:scaleX(-1)}
 .camera-entry #preview[hidden]{display:none}
+#public-tree-count{margin:.75rem auto 0;color:#dfbe91;font-size:.8rem}
 </style>
 </head>
 <body>
@@ -111,6 +112,7 @@ main{grid-template-columns:minmax(0,1fr)}
 <button id="share-online">分享我的圣诞树链接</button>
 <p id="photo-save-status" role="status" hidden></p>
 
+<p id="public-tree-count" role="status">累计浏览 · 累计互动｜统计尚未接通</p>
 <p class="rights-notice">原创设计 · Xxnefeli<br>严禁抄袭、冒用署名，或未经授权复制、改编、转载本站原创设计与交互实现。欢迎通过本站分享功能转发作品。</p>
 </footer>
 
@@ -136,7 +138,32 @@ if (/^G-[A-Z0-9]+$/.test(analyticsId) && location.protocol === 'https:') {
   document.head.append(analyticsScript);
 }
 let interacted = false;
+const publicCountEndpoint = '';
+const publicCountLabel = document.getElementById('public-tree-count');
+const publicVisitId = publicCountEndpoint && location.protocol === 'https:' ? crypto.randomUUID() : '';
+let countedInteraction = false;
+let publicCountQueue = Promise.resolve();
+function submitPublicCount(event) {
+  if (!publicVisitId) return;
+  publicCountQueue = publicCountQueue.then(async () => {
+    const result = await fetch(publicCountEndpoint, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({event, visit:publicVisitId}),
+      cache:'no-store'
+    });
+    if (!result.ok) throw new Error('Counter unavailable');
+    const {views, interactions} = await result.json();
+    if (![views, interactions].every(n => Number.isSafeInteger(n) && n >= 0)) throw new Error('Invalid counter');
+    publicCountLabel.textContent = '累计浏览 ' + views.toLocaleString('zh-CN') + ' · 累计互动 ' + interactions.toLocaleString('zh-CN');
+  }).catch(() => { publicCountLabel.textContent = '浏览和互动统计暂不可用'; });
+}
+submitPublicCount('view');
 function recordInteraction(name) {
+  if (!countedInteraction && ['tree_mode_change','ornament_open','tree_drag','tree_gesture'].includes(name)) {
+    countedInteraction = true;
+    submitPublicCount('interaction');
+  }
   if (!window.gtag) return;
   if (!interacted && name !== 'tip_open') {
     interacted = true;
@@ -862,7 +889,10 @@ cameraButton.onclick = async () => {
       const now = performance.now();
       if (now >= manualUntil && cursor.hidden && !zoomAnchor && palmX === null) {
         const mode = gestureFilter(gesture, now);
-        if (mode) setMode(mode);
+        if (mode) {
+          setMode(mode);
+          recordInteraction('tree_gesture');
+        }
       }
       const message = palmX !== null ? '掌心转树 · 左右移动' : !points ? '手势已开启 · 请把一只手放进画面' : gesture === 'gather' ? 'Camera on · Closed fist' : gesture === 'scatter' ? 'Camera on · Open palm' : 'Camera on · Hold an open palm or closed fist';
       if (status.textContent !== message) status.textContent = message;
