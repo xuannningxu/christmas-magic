@@ -14,6 +14,7 @@ header{padding:clamp(1.5rem,5vh,3.5rem) 1rem 0;z-index:1;pointer-events:none}
 h1{margin:.38rem 0 0;font:400 clamp(1.85rem,6.7vw,5.5rem)/1.08 Georgia,serif;letter-spacing:.095em;text-transform:uppercase;text-shadow:0 0 30px #b66b3059}
 #scene{position:relative;min-height:300px}
 canvas{position:absolute;inset:0;display:block;width:100%;height:100%}
+#scene canvas{pointer-events:none}
 footer{z-index:1;padding:0 1rem max(1rem,env(safe-area-inset-bottom))}
 p{margin:.55rem 0 .8rem}
 #hint{color:#eacba7}
@@ -726,6 +727,14 @@ function clearAim() {
   pointedPhoto = -1;
 }
 
+function fitParticleCanvas(canvas) {
+  const page = sceneHost.closest('main');
+  const sceneTop = sceneHost.offsetTop;
+  const pageHeight = page.clientHeight;
+  canvas.style.top = -sceneTop + 'px';
+  canvas.style.height = pageHeight + 'px';
+  return {sceneTop,pageHeight};
+}
 async function buildScene() {
   const T = await importThree();
   const renderer = new T.WebGLRenderer({ alpha: true, antialias: false });
@@ -800,7 +809,7 @@ async function buildScene() {
   for (const [name, values] of Object.entries({ position: start, destination: end, tint: colors, sampleData: samples })) {
     geometry.setAttribute(name, new T.Float32BufferAttribute(values, 3));
   }
-  const uniforms = { time: {value: 0}, progress: {value: 0}, spin: {value: 0}, pixelRatio: {value: 1}, scale: {value: 1} };
+  const uniforms = { time: {value: 0}, progress: {value: 0}, spin: {value: 0}, pixelRatio: {value: 1}, scale: {value: 1}, pageLayout: {value: new T.Vector2(0,1)} };
   const material = new T.ShaderMaterial({
     uniforms, transparent: true, depthWrite: false, blending: T.AdditiveBlending,
     vertexShader: `
@@ -808,6 +817,7 @@ async function buildScene() {
       attribute vec3 tint;
       attribute vec3 sampleData;
       uniform float time, progress, spin, pixelRatio, scale;
+      uniform vec2 pageLayout;
       varying vec3 light;
       varying float intensity;
       void main() {
@@ -824,10 +834,20 @@ async function buildScene() {
         if (position.y > 2.34 && background < .5) angle *= p;
         pos.xz = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * pos.xz;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        float expanded = smoothstep(.12, 1.0, p) * (1.0 - background);
+        float sceneY = .5 + .5 * gl_Position.y / gl_Position.w;
+        float lower = 1.0 - pageLayout.x - pageLayout.y;
+        float originalY = lower + sceneY * pageLayout.y;
+        float targetY = fract(sin(phase * 311.7) * 19341.7123);
+        float pageY = mix(originalY, targetY, expanded);
+        gl_Position.y = (pageY * 2.0 - 1.0) * gl_Position.w;
+        float room = min(pageY - lower, lower + pageLayout.y - pageY);
+        float comfort = mix(.28, 1.0, smoothstep(-.025, .045, room));
+        float originalClip = step(0.0, sceneY) * step(sceneY, 1.0);
         float twinkle = pow(.5 + .5 * sin(time * (1.7 + phase * .35) + phase * 9.0), 3.0);
         gl_PointSize = max(1.0, pixelRatio * scale * sampleData.x * (1.15 + twinkle * .6 + p * .25));
         light = tint;
-        intensity = mix(.65, .27, background) * (.35 + .65 * twinkle);
+        intensity = mix(.65, .27, background) * (.35 + .65 * twinkle) * mix(originalClip, comfort, expanded);
       }`,
     fragmentShader: `
       varying vec3 light;
@@ -843,17 +863,21 @@ async function buildScene() {
   const cloud = new T.Points(geometry, material);
   cloud.frustumCulled = false;
   scene.add(cloud);
-  new ResizeObserver(() => {
+  const particleResize = new ResizeObserver(() => {
     const {clientWidth: w, clientHeight: h} = sceneHost;
     if (!w || !h) return;
-    renderer.setSize(w, h, false);
+    const {sceneTop,pageHeight} = fitParticleCanvas(renderer.domElement);
+    renderer.setSize(w, pageHeight, false);
+    uniforms.pageLayout.value.set(sceneTop/pageHeight,h/pageHeight);
     const halfWidth = Math.max(2.13, 3.18 * w / h);
     const halfHeight = halfWidth * h / w;
     Object.assign(camera, {left:-halfWidth, right:halfWidth, top:halfHeight, bottom:-halfHeight, near:.1, far:40});
     camera.updateProjectionMatrix();
     uniforms.pixelRatio.value = renderer.getPixelRatio();
     uniforms.scale.value = Math.max(.65, Math.min(1.35, h / halfHeight / 175));
-  }).observe(sceneHost);
+  });
+  particleResize.observe(sceneHost);
+  particleResize.observe(sceneHost.closest('main'));
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const center = new T.Vector3();
   const vertical = new T.Vector3(0,1,0);
@@ -1140,12 +1164,13 @@ function buildFallback() {
     zoom += (zoomTarget-zoom)*(1-Math.exp(-dt*9));
     const w = sceneHost.clientWidth, h = sceneHost.clientHeight;
     const dpr = Math.min(devicePixelRatio || 1, 2);
-    if (canvas.width !== Math.round(w*dpr) || canvas.height !== Math.round(h*dpr)) {
+    const {sceneTop,pageHeight} = fitParticleCanvas(canvas);
+    if (canvas.width !== Math.round(w*dpr) || canvas.height !== Math.round(pageHeight*dpr)) {
       canvas.width = Math.round(w*dpr);
-      canvas.height = Math.round(h*dpr);
+      canvas.height = Math.round(pageHeight*dpr);
     }
     ctx.setTransform(dpr,0,0,dpr,0,0);
-    ctx.clearRect(0,0,w,h);
+    ctx.clearRect(0,0,w,pageHeight);
     const scale = Math.min(w/5,h/6.5)*zoom;
     const cx = w/2, cy = h/2;
     const t = reduce.matches ? 0 : now/1000;
@@ -1158,12 +1183,19 @@ function buildFallback() {
       ctx.globalAlpha = .35+.6*Math.pow(.5+.5*Math.sin(t*2+phase),2);
       ctx.fillStyle = color;
       const size = .48+1.22*(phase/6.28);
-      ctx.fillRect(cx+(px+(ex-px)*spread)*scale,cy+(y+(ey-y)*spread)*scale,size,size);
+      const sceneY = cy+(y+(ey-y)*spread)*scale;
+      const expanded = spread*spread*(3-2*spread);
+      const pageY = (sceneTop+sceneY)*(1-expanded) + (ey/6+.5)*pageHeight*expanded;
+      const room = Math.min(pageY-sceneTop,sceneTop+h-pageY);
+      const comfort = .28+.72*Math.max(0,Math.min(1,(room+15)/50));
+      const originalClip = sceneY >= 0 && sceneY <= h ? 1 : 0;
+      ctx.globalAlpha *= originalClip*(1-expanded)+comfort*expanded;
+      ctx.fillRect(cx+(px+(ex-px)*spread)*scale,pageY,size,size);
     }
     ctx.fillStyle = '#ffe5a0';
     for (const [x,y,phase] of star) {
       ctx.globalAlpha = (1-spread)*(.3+.55*(.5+.5*Math.sin(t*3+phase)));
-      ctx.fillRect(cx+x*scale,cy-(2.49+y)*scale,1.25,1.25);
+      ctx.fillRect(cx+x*scale,sceneTop+cy-(2.49+y)*scale,1.25,1.25);
     }
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
