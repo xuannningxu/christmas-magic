@@ -162,6 +162,13 @@ main>header{padding-top:max(2.85rem,env(safe-area-inset-top))}
 </footer>
 
 </main>
+<dialog id="export-checkout" aria-labelledby="export-checkout-title">
+<form method="dialog"><button class="close-photo" aria-label="关闭">×</button></form>
+<h2 id="export-checkout-title">导出专属圣诞树</h2>
+<p>一次导出 · $0.50 USD</p>
+<button id="export-pay" type="button">使用 PayPal 付款</button>
+<p id="export-payment-status" role="status"></p>
+</dialog>
 <dialog id="tip-dialog" aria-labelledby="tip-title">
 <form method="dialog"><button class="close-photo" aria-label="关闭赞赏">×</button></form>
 <h2 id="tip-title">微信赞赏</h2>
@@ -456,34 +463,91 @@ document.getElementById('send-tree-file').onclick = async () => {
     if (error.name !== 'AbortError') showPhotoStatus('系统分享失败，可再点导出并保存文件。');
   }
 };
-shareButton.onclick = async () => {
-  shareButton.disabled = true;
+const exportPaymentApi = ''; // Set to the deployed Worker origin in the test environment.
+const checkout = document.getElementById('export-checkout');
+const payButton = document.getElementById('export-pay');
+const paymentStatus = document.getElementById('export-payment-status');
+const checkoutParams = new URLSearchParams(location.search);
+const checkoutToken = checkoutParams.get('token');
+let checkoutDatabase;
+function openCheckoutDatabase() {
+  checkoutDatabase ??= new Promise((resolve,reject) => {
+    const request = indexedDB.open('christmas-magic-checkout',1);
+    request.onupgradeneeded = () => request.result.createObjectStore('checkout');
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  return checkoutDatabase;
+}
+async function checkoutDraft(value) {
+  const db = await openCheckoutDatabase();
+  return new Promise((resolve,reject) => {
+    const transaction = db.transaction('checkout',value === undefined ? 'readonly' : 'readwrite');
+    const store = transaction.objectStore('checkout');
+    const request = value === undefined ? store.get('pending') : store.put(value,'pending');
+    transaction.oncomplete = () => resolve(request.result);
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+async function paymentRequest(path,body) {
+  const response = await fetch(exportPaymentApi + path,{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)
+  });
+  if (!response.ok) throw new Error('Payment API ' + response.status);
+  return response.json();
+}
+function showCheckout() {
+  const returning = checkoutParams.get('checkout') === 'return' && !!checkoutToken;
+  payButton.textContent = returning ? '确认付款并导出' : '使用 PayPal 付款';
+  payButton.disabled = !exportPaymentApi;
+  paymentStatus.textContent = exportPaymentApi ? '' : '付费导出正在测试中。';
+  checkout.showModal();
+}
+shareButton.onclick = showCheckout;
+if (checkoutParams.get('checkout') === 'return' && exportPaymentApi) showCheckout();
+
+payButton.onclick = async () => {
+  payButton.disabled = true;
   try {
-    await restoredPhotos;
-    if (!photoBlobs.size && !Object.keys(sharedPhotos).length) {
-      showPhotoStatus('先打开一个挂饰并更换照片，再导出分享文件。');
+    if (checkoutParams.get('checkout') === 'return' && checkoutToken) {
+      const draft = await checkoutDraft();
+      if (!draft?.id || !draft.secret || typeof draft.page !== 'string') throw new Error('Draft missing');
+      const file = new File([draft.page],'我的圣诞树.html',{type:'text/html'});
+      paymentStatus.textContent = '正在核实付款…';
+      const result = await paymentRequest('/confirm',{id:draft.id,secret:draft.secret,orderId:checkoutToken});
+      if (result.paid !== true) throw new Error('Payment not confirmed');
+      readyTreeFile = file;
+      const send = document.getElementById('send-tree-file');
+      send.hidden = !navigator.canShare?.({files:[file]});
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(file);
+      link.download = file.name;
+      link.textContent = '下载我的圣诞树';
+      paymentStatus.replaceChildren(link);
+      setTimeout(() => URL.revokeObjectURL(link.href), 600000);
+      history.replaceState(null,'',location.pathname);
+      payButton.hidden = true;
       return;
     }
-    const source = exportTemplate;
-    const entries = await Promise.all([...photoBlobs].map(async ([index, blob]) => [index, await dataUrl(blob)]));
-    const page = buildSharedPage(source, {...sharedPhotos, ...Object.fromEntries(entries)});
-    const file = new Blob([page], {type:'text/html'});
-    readyTreeFile = new File([file], '我的圣诞树.html', {type:'text/html'});
-    const sendFile = document.getElementById('send-tree-file');
-    sendFile.hidden = !navigator.canShare?.({files:[readyTreeFile]});
-    const url = URL.createObjectURL(file);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = '我的圣诞树.html';
-    document.body.append(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
-    showPhotoStatus('已生成带照片的网页。可发送下载的文件，或点「发送已导出的文件」。');
+    await restoredPhotos;
+    const entries = await Promise.all([...photoBlobs].map(async ([index,blob]) => [index,await dataUrl(blob)]));
+    const snapshot = {...sharedPhotos,...Object.fromEntries(entries)};
+    if (!Object.keys(snapshot).length) {
+      paymentStatus.textContent = '请先为至少一个挂饰设置照片。';
+      return;
+    }
+    const design = JSON.stringify({ornaments:ornamentSettings,theme:document.documentElement.dataset.treeTheme || 'gold'}).replace(/</g,'\\u003c');
+    const designTag = '<script id="exported-tree-design" type="application/json">' + design + '</'+'script>';
+    const page = buildSharedPage(exportTemplate,snapshot).replace(/^<script>$/m,()=>designTag+'\n<script>');
+    await checkoutDraft({page});
+    const {id,secret,approval} = await paymentRequest('/create',{});
+    if (!id || !secret || !approval) throw new Error('Missing checkout information');
+    await checkoutDraft({id,secret,page});
+    location.assign(approval);
   } catch {
-    showPhotoStatus('导出失败。请在浏览器打开 GitHub Pages 在线版后再试。');
+    paymentStatus.textContent = '暂时无法完成导出。请保留当前浏览器并重试。';
   } finally {
-    shareButton.disabled = false;
+    payButton.disabled = false;
   }
 };
 let selectedPhoto = 0;
@@ -504,8 +568,11 @@ function isOkGesture(points) {
     [9,13,17].every(base => distance(0,base+3) > distance(0,base+1)*1.13);
 }
 const [kindField,colorField,heightField,angleField] = ornamentEditor.querySelectorAll('select,input');
+let exportedDesign = null;
+try { exportedDesign = JSON.parse(document.getElementById('exported-tree-design')?.textContent || 'null'); } catch {}
 let ornamentSettings = {};
 try { ornamentSettings = JSON.parse(localStorage.getItem('tree-ornaments') || '{}') || {}; } catch {}
+if (exportedDesign?.ornaments) ornamentSettings = exportedDesign.ornaments;
 function refreshEditor(index) {
   const item = ornamentConfig(index);
   kindField.value = item.kind;
@@ -1220,7 +1287,7 @@ const browserLanguage = navigator.language || 'zh-CN';
 langMenu.value = readPreference('tree-language') ||
   (/^zh-(TW|HK|MO|Hant)/i.test(browserLanguage) ? 'zh-TW' : /^zh/i.test(browserLanguage) ? 'zh-CN' : /^es/i.test(browserLanguage) ? 'es' : /^fr/i.test(browserLanguage) ? 'fr' : 'en');
 if (!langMenu.value) langMenu.value = 'zh-CN';
-themeMenu.value = readPreference('tree-theme') || 'gold';
+themeMenu.value = exportedDesign?.theme || readPreference('tree-theme') || 'gold';
 if (!themeMenu.value) themeMenu.value = 'gold';
 function applyTheme() { document.documentElement.dataset.treeTheme = themeMenu.value; }
 applyTheme();
