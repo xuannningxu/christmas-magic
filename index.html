@@ -824,10 +824,14 @@ async function buildScene() {
         if (position.y > 2.34 && background < .5) angle *= p;
         pos.xz = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * pos.xz;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        float spread = p * (1.0 - background);
+        vec2 star = vec2(fract(sin(phase * 127.1) * 43758.5453),
+                         fract(sin(phase * 311.7) * 19341.7123)) * 2.0 - 1.0;
+        gl_Position.xy = mix(gl_Position.xy, star * gl_Position.w, spread);
         float twinkle = pow(.5 + .5 * sin(time * (1.7 + phase * .35) + phase * 9.0), 3.0);
         gl_PointSize = max(1.0, pixelRatio * scale * sampleData.x * (1.15 + twinkle * .6 + p * .25));
-        light = tint;
-        intensity = mix(.65, .27, background) * (.35 + .65 * twinkle);
+        light = mix(tint, vec3(.88,.94,1.0), spread * .72);
+        intensity = mix(.65, .27, background) * (.35 + .65 * twinkle) * (1.0 + spread * 1.65);
       }`,
     fragmentShader: `
       varying vec3 light;
@@ -1158,7 +1162,12 @@ function buildFallback() {
       ctx.globalAlpha = .35+.6*Math.pow(.5+.5*Math.sin(t*2+phase),2);
       ctx.fillStyle = color;
       const size = .48+1.22*(phase/6.28);
-      ctx.fillRect(cx+(px+(ex-px)*spread)*scale,cy+(y+(ey-y)*spread)*scale,size,size);
+      const flicker = .5 + .5 * Math.sin(t*2 + phase);
+      ctx.globalAlpha = Math.min(1, ctx.globalAlpha + spread * (.18 + .2*flicker));
+      if (spread > .45) ctx.fillStyle = phase > 2.1 ? '#eef5ff' : '#ffe4ab';
+      const screenX = cx + px*scale*(1-spread) + ex*w*.1*spread;
+      const screenY = cy + y*scale*(1-spread) + ey*h/6*spread;
+      ctx.fillRect(screenX,screenY,size+spread*.45,size+spread*.45);
     }
     ctx.fillStyle = '#ffe5a0';
     for (const [x,y,phase] of star) {
