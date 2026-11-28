@@ -846,10 +846,12 @@ async function buildScene() {
         float room = min(pageY - lower, lower + pageLayout.y - pageY);
         float comfort = mix(.28, 1.0, smoothstep(-.025, .045, room));
         float originalClip = step(0.0, sceneY) * step(sceneY, 1.0);
+        gl_Position.xy += vec2(sin(time*.39+phase*2.1)*.008,cos(time*.32+phase*2.8)*.006)*expanded*gl_Position.w;
+        float centerLight = 1.0-smoothstep(.08,.85,length(gl_Position.xy/gl_Position.w));
         float twinkle = pow(.5 + .5 * sin(time * (1.7 + phase * .35) + phase * 9.0), 3.0);
         gl_PointSize = max(1.0, pixelRatio * scale * sampleData.x * (1.15 + twinkle * .6 + p * .25));
         light = tint;
-        intensity = mix(.65, .27, background) * (.35 + .65 * twinkle) * mix(originalClip, comfort, expanded);
+        intensity = mix(.65, .27, background) * (.35 + .65 * twinkle) * mix(originalClip, comfort*(1.0+.31*centerLight), expanded);
       }`,
     fragmentShader: `
       varying vec3 light;
@@ -1194,7 +1196,11 @@ function buildFallback() {
       ctx.globalAlpha *= originalClip*(1-expanded)+comfort*expanded;
       const sceneX = cx+(px+(ex-px)*spread)*scale;
       const pageX = sceneX*(1-expanded)+(ex/10+.5)*w*expanded;
-      ctx.fillRect(pageX,pageY,size,size);
+      const centerLight = Math.max(0,1-Math.hypot(2*pageX/w-1,2*pageY/pageHeight-1)/.85);
+      ctx.globalAlpha = Math.min(1,ctx.globalAlpha*(1+.31*centerLight*expanded));
+      const motion = reduce.matches ? 0 : expanded;
+      ctx.fillRect(pageX+Math.sin(t*.39+phase*2.1)*3*motion,
+        pageY+Math.cos(t*.32+phase*2.8)*3*motion,size,size);
     }
     ctx.fillStyle = '#ffe5a0';
     for (const [x,y,phase] of star) {
