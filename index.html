@@ -838,6 +838,8 @@ async function buildScene() {
         float sceneY = .5 + .5 * gl_Position.y / gl_Position.w;
         float lower = 1.0 - pageLayout.x - pageLayout.y;
         float originalY = lower + sceneY * pageLayout.y;
+        float targetX = fract(sin(phase * 127.1) * 43758.5453) * 2.0 - 1.0;
+        gl_Position.x = mix(gl_Position.x, targetX * gl_Position.w, expanded);
         float targetY = fract(sin(phase * 311.7) * 19341.7123);
         float pageY = mix(originalY, targetY, expanded);
         gl_Position.y = (pageY * 2.0 - 1.0) * gl_Position.w;
@@ -1190,7 +1192,9 @@ function buildFallback() {
       const comfort = .28+.72*Math.max(0,Math.min(1,(room+15)/50));
       const originalClip = sceneY >= 0 && sceneY <= h ? 1 : 0;
       ctx.globalAlpha *= originalClip*(1-expanded)+comfort*expanded;
-      ctx.fillRect(cx+(px+(ex-px)*spread)*scale,pageY,size,size);
+      const sceneX = cx+(px+(ex-px)*spread)*scale;
+      const pageX = sceneX*(1-expanded)+(ex/10+.5)*w*expanded;
+      ctx.fillRect(pageX,pageY,size,size);
     }
     ctx.fillStyle = '#ffe5a0';
     for (const [x,y,phase] of star) {
