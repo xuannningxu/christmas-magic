@@ -126,10 +126,13 @@ main>header{padding-top:max(2.85rem,env(safe-area-inset-top))}
 [data-tree-theme=rose] #scene canvas{filter:hue-rotate(142deg) saturate(1.15) brightness(1.12)}
 [data-tree-theme=cedar] #scene canvas{filter:hue-rotate(92deg) saturate(1.1) brightness(1.12)}
 [data-tree-theme=violet] #scene canvas{filter:hue-rotate(350deg) saturate(1.32) brightness(1.08)}
+#screen-stars{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+#screen-stars[hidden]{display:none}
 </style>
 </head>
 <body>
 <main>
+<canvas id="screen-stars" aria-hidden="true" hidden></canvas>
 <div class="scene-preferences"><label>Language <select id="site-language" aria-label="Language"><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文</option><option value="en">English</option><option value="es">Español</option><option value="fr">Français</option></select></label>
 <label><span>主题色</span> <select id="tree-theme"><option value="gold">金色</option><option value="mint">淡绿色</option><option value="ice">冰蓝色</option><option value="rose">玫瑰粉</option><option value="cedar">雪松红</option><option value="violet">暮夜紫</option></select></label></div>
 <noscript><p>当前文件预览无法运行交互。请保存 HTML 后，用电脑上的 Edge 或 Chrome 打开。</p></noscript>
@@ -726,6 +729,45 @@ function clearAim() {
   pointedPhoto = -1;
 }
 
+const screenStars = document.getElementById('screen-stars');
+const screenStarContext = screenStars.getContext('2d');
+const starHeader = document.querySelector('main > header');
+const starFooter = document.querySelector('main > footer');
+const stillStars = matchMedia('(prefers-reduced-motion: reduce)');
+const fullscreenStars = Array.from({length:950}, () => ({
+  x:Math.random(), y:Math.random(), phase:Math.random()*Math.PI*2, size:.55+Math.random()**3*1.45
+}));
+function drawScreenStars(spread, time) {
+  if (!screenStarContext) return;
+  const opacity = Math.max(0, (spread-.25)/.75);
+  screenStars.hidden = opacity < .015;
+  if (screenStars.hidden) return;
+  const w = screenStars.clientWidth, h = screenStars.clientHeight;
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const width = Math.round(w*dpr), height = Math.round(h*dpr);
+  if (screenStars.width !== width || screenStars.height !== height) {
+    screenStars.width = width;
+    screenStars.height = height;
+  }
+  const ctx = screenStarContext;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+  const headerEnd = starHeader.getBoundingClientRect().bottom;
+  const footerStart = starFooter.getBoundingClientRect().top;
+  const seconds = stillStars.matches ? 0 : time;
+  for (const {x,y,phase,size} of fullscreenStars) {
+    const px = x*w, py = y*h;
+    const clearance = Math.min(py-headerEnd,footerStart-py);
+    const tone = .17 + .83*Math.max(0,Math.min(1,clearance/65));
+    const twinkle = .26+.74*(.5+.5*Math.sin(seconds*1.75+phase))**2;
+    ctx.globalAlpha = opacity*tone*twinkle;
+    ctx.fillStyle = phase > 4.7 ? '#ffe0a0' : '#f0f4ff';
+    ctx.beginPath();
+    ctx.arc(px,py,size,0,Math.PI*2);
+    ctx.fill();
+  }
+}
+
 async function buildScene() {
   const T = await importThree();
   const renderer = new T.WebGLRenderer({ alpha: true, antialias: false });
@@ -831,7 +873,7 @@ async function buildScene() {
         float twinkle = pow(.5 + .5 * sin(time * (1.7 + phase * .35) + phase * 9.0), 3.0);
         gl_PointSize = max(1.0, pixelRatio * scale * sampleData.x * (1.15 + twinkle * .6 + p * .25));
         light = mix(tint, vec3(.88,.94,1.0), spread * .72);
-        intensity = mix(.65, .27, background) * (.35 + .65 * twinkle) * (1.0 + spread * 1.65);
+        intensity = mix(.65, .27, background) * (.35 + .65 * twinkle) * (1.0 + spread * .8) * (1.0 - smoothstep(.25, 1.0, spread));
       }`,
     fragmentShader: `
       varying vec3 light;
@@ -884,6 +926,7 @@ async function buildScene() {
       center.project(camera);
       placeOrnament(button,(center.x+1)*.5*width,(1-center.y)*.5*height,depth,width,height,visible);
     });
+    drawScreenStars(uniforms.progress.value, uniforms.time.value);
     renderer.render(scene, camera);
   });
 }
@@ -1155,6 +1198,7 @@ function buildFallback() {
     const t = reduce.matches ? 0 : now/1000;
     if (!reduce.matches && cursor.hidden && !gallery.open && palmX === null && !drag) treeAngle += dt * .15;
     const spin = treeAngle;
+    drawScreenStars(spread, t);
     const cosine = Math.cos(spin), sine = Math.sin(spin);
     ctx.globalCompositeOperation = 'lighter';
     for (const [x,y,z,ex,ey,phase,color] of particles) {
@@ -1163,7 +1207,7 @@ function buildFallback() {
       ctx.fillStyle = color;
       const size = .48+1.22*(phase/6.28);
       const flicker = .5 + .5 * Math.sin(t*2 + phase);
-      ctx.globalAlpha = Math.min(1, ctx.globalAlpha + spread * (.18 + .2*flicker));
+      ctx.globalAlpha = Math.min(1, ctx.globalAlpha + spread * (.18 + .2*flicker)) * (1 - Math.max(0,(spread-.25)/.75));
       if (spread > .45) ctx.fillStyle = phase > 2.1 ? '#eef5ff' : '#ffe4ab';
       const screenX = cx + px*scale*(1-spread) + ex*w*.1*spread;
       const screenY = cy + y*scale*(1-spread) + ey*h/6*spread;
