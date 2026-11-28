@@ -854,8 +854,9 @@ async function buildScene() {
         float phase = sampleData.y;
         float background = sampleData.z;
         float p = smoothstep(0.0, 1.0, progress);
-        vec3 pos = mix(position, destination, p);
-        pos += p * (1.0 - background) * vec3(
+        float titleParticle = (1.0 - step(1.0, titleTarget.y)) * (1.0-background);
+        vec3 pos = mix(position, destination, p * (1.0-titleParticle));
+        pos += p * (1.0 - background) * (1.0-titleParticle) * vec3(
           sin(time * .83 + phase), cos(time * .66 + phase), sin(time * .72 + phase * 2.0)
         ) * (.17 + .65 * sin(p * 3.14159));
         float angle = spin * (1.0 - background);
@@ -871,12 +872,12 @@ async function buildScene() {
         float targetX = fract(sin(phase * 127.1) * 43758.5453) * 2.0 - 1.0;
 
         float targetY = fract(sin(phase * 311.7) * 19341.7123);
-        float letter = (1.0 - step(1.0, titleTarget.y)) * smoothstep(.55,.98,p) * (1.0-background);
+        float letter = titleParticle * expanded;
         float textWidth = min(.88,650.0/pageLayout.z);
         float textX = titleTarget.x*textWidth*2.0 + .012*sin(time*.54+titleTarget.y*3.0);
         float textY = lower + pageLayout.y*.5 + titleTarget.y*textWidth*.15*pageLayout.z/pageLayout.w;
-        targetX = mix(targetX,textX,letter);
-        targetY = mix(targetY,textY,letter);
+        targetX = mix(targetX,textX,titleParticle);
+        targetY = mix(targetY,textY,titleParticle);
         gl_Position.x = mix(gl_Position.x, targetX * gl_Position.w, expanded);
         float pageY = mix(originalY, targetY, expanded);
         gl_Position.y = (pageY * 2.0 - 1.0) * gl_Position.w;
@@ -926,7 +927,7 @@ async function buildScene() {
   renderer.setAnimationLoop(ms => {
     const dt = Math.min(.05, (ms - last) / 1000);
     last = ms;
-    uniforms.progress.value += (target - uniforms.progress.value) * (1 - Math.exp(-dt * (reduced.matches ? 10 : 3.5)));
+    uniforms.progress.value += (target - uniforms.progress.value) * (1 - Math.exp(-dt * (reduced.matches ? 10 : 2.65)));
     if (!reduced.matches) {
       uniforms.time.value += dt;
       if (cursor.hidden && !gallery.open && palmX === null && !drag) treeAngle += dt * .15;
@@ -1201,7 +1202,7 @@ function buildFallback() {
   function draw(now) {
     const dt = Math.min(.05,(now-last)/1000);
     last = now;
-    spread += (target-spread)*(1-Math.exp(-dt*4));
+    spread += (target-spread)*(1-Math.exp(-dt*(reduce.matches ? 10 : 2.9)));
     zoom += (zoomTarget-zoom)*(1-Math.exp(-dt*9));
     const w = sceneHost.clientWidth, h = sceneHost.clientHeight;
     const dpr = Math.min(devicePixelRatio || 1, 2);
@@ -1225,20 +1226,21 @@ function buildFallback() {
       ctx.globalAlpha = .35+.6*Math.pow(.5+.5*Math.sin(t*2+phase),2);
       ctx.fillStyle = color;
       const size = .48+1.22*(phase/6.28);
-      const sceneY = cy+(y+(ey-y)*spread)*scale;
-      const expanded = spread*spread*(3-2*spread);
       const [letterX,letterY] = titlePoint(particleIndex++);
-      const letter = letterY < 1 ? Math.max(0,Math.min(1,(spread-.55)/.43)) : 0;
+      const titleParticle = letterY < 1;
+      const expanded = spread*spread*(3-2*spread);
+      const letter = titleParticle ? expanded : 0;
+      const sceneY = cy+(titleParticle ? y : y+(ey-y)*spread)*scale;
       const titleWidth = Math.min(w*.88,650);
-      const targetY = (ey/6+.5)*pageHeight*(1-letter) + (sceneTop+h/2-letterY*titleWidth*.15)*letter;
+      const targetY = titleParticle ? sceneTop+h/2-letterY*titleWidth*.15 : (ey/6+.5)*pageHeight;
       const pageY = (sceneTop+sceneY)*(1-expanded) + targetY*expanded;
       const room = Math.min(pageY-sceneTop,sceneTop+h-pageY);
       const comfort = .28+.72*Math.max(0,Math.min(1,(room+15)/50));
       const originalClip = sceneY >= 0 && sceneY <= h ? 1 : 0;
       ctx.globalAlpha *= originalClip*(1-expanded)+comfort*expanded;
-      const sceneX = cx+(px+(ex-px)*spread)*scale;
+      const sceneX = cx+(titleParticle ? px : px+(ex-px)*spread)*scale;
       const titleDrift = Math.sin(t*.54+letterY*3)*w*.006;
-      const targetX = (ex/10+.5)*w*(1-letter) + (w/2+letterX*titleWidth+titleDrift)*letter;
+      const targetX = titleParticle ? w/2+letterX*titleWidth+titleDrift : (ex/10+.5)*w;
       const pageX = sceneX*(1-expanded)+targetX*expanded;
       if (letter > .65) ctx.fillStyle = '#fff4da';
       const centerLight = Math.max(0,1-Math.hypot(2*pageX/w-1,2*pageY/pageHeight-1)/.85);
